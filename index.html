@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProtoReader - Quiz Bowl Practice</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">ProtoReader</div>
+        <div class="nav-menu">
+            <a href="#" data-screen="home">Home</a>
+            <a href="#" data-screen="database">Database</a>
+            <a href="#" data-screen="statistics">Statistics</a>
+            <a href="#" data-screen="settings">Settings</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Home Screen -->
+        <div id="home" class="screen active">
+            <h1>ProtoReader</h1>
+            <p class="subtitle">Your Personal Quiz Bowl Practice Platform</p>
+            <p class="credit">Created by Lawrence Tong</p>
+            
+            <div class="mode-cards">
+                <div class="mode-card" id="tossup-mode-card">
+                    <div class="mode-icon">TU</div>
+                    <h3>Tossups</h3>
+                    <p>Practice individual questions with buzz-in mechanics</p>
+                </div>
+                <div class="mode-card" id="bonus-mode-card">
+                    <div class="mode-icon">B</div>
+                    <h3>Bonuses</h3>
+                    <p>Practice three-part bonus questions for points</p>
+                </div>
+                <div class="mode-card" id="multiplayer-mode-card">
+                    <div class="mode-icon">MP</div>
+                    <h3>Multiplayer</h3>
+                    <p>Compete with friends in real-time (Coming Soon)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tossup Setup Screen -->
+        <div id="tossup-setup" class="screen">
+            <h2>Tossup Practice Setup</h2>
+            <div class="setup-panel">
+                <div class="filter-section">
+                    <h3>Filters</h3>
+                    <div class="filter-grid">
+                        <div class="filter-item">
+                            <label>Categories (click to select)</label>
+                            <div class="category-pills" id="category-pills"></div>
+                        </div>
+                        <div class="filter-item">
+                            <label>Difficulties (click to select)</label>
+                            <div class="difficulty-pills" id="difficulty-pills"></div>
+                        </div>
+                        <div class="filter-item">
+                            <label>Year Range</label>
+                            <div class="year-range">
+                                <input type="number" id="year-start" min="2000" max="2026" value="2010">
+                                <span>to</span>
+                                <input type="number" id="year-end" min="2000" max="2026" value="2024">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="button-group">
+                <button class="start-btn" id="start-tossup-btn">Start Practice</button>
+                <button class="back-btn" id="back-to-home-tossup">Back</button>
+            </div>
+        </div>
+
+        <!-- Bonus Setup Screen -->
+        <div id="bonus-setup" class="screen">
+            <h2>Bonus Practice Setup</h2>
+            <div class="setup-panel">
+                <div class="filter-section">
+                    <h3>Filters</h3>
+                    <div class="filter-grid">
+                        <div class="filter-item">
+                            <label>Categories (click to select)</label>
+                            <div class="category-pills" id="bonus-category-pills"></div>
+                        </div>
+                        <div class="filter-item">
+                            <label>Difficulties (click to select)</label>
+                            <div class="difficulty-pills" id="bonus-difficulty-pills"></div>
+                        </div>
+                        <div class="filter-item">
+                            <label>Year Range</label>
+                            <div class="year-range">
+                                <input type="number" id="bonus-year-start" min="2000" max="2026" value="2010">
+                                <span>to</span>
+                                <input type="number" id="bonus-year-end" min="2000" max="2026" value="2024">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="button-group">
+                <button class="start-btn" id="start-bonus-btn">Start Practice</button>
+                <button class="back-btn" id="back-to-home-bonus">Back</button>
+            </div>
+        </div>
+
+        <!-- Tossup Game Screen -->
+        <div id="tossup-game" class="screen">
+            <div class="game-header">
+                <div class="header-left">
+                    <div class="stat-pill">Questions: <span id="question-count">0</span></div>
+                    <div class="stat-pill">Correct: <span id="correct-count">0</span></div>
+                    <div class="stat-pill">Accuracy: <span id="accuracy">0%</span></div>
+                </div>
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <label for="game-speed" style="font-weight: 600; color: var(--text);">Speed:</label>
+                    <input type="range" id="game-speed" min="50" max="500" value="250" step="10" style="width: 120px;">
+                    <span id="game-speed-value" style="font-weight: 600; color: var(--primary); min-width: 50px;">250</span>
+                </div>
+                <div class="header-right">
+                    <div class="timer-display">
+                        <div id="timer" class="timer">5.0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="question-display">
+                <div id="question-metadata" class="question-metadata"></div>
+                <div id="question-text" class="question-text">Loading question...</div>
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+            </div>
+
+            <div class="buzz-section">
+                <div style="text-align: center; font-size: 1.2rem; color: var(--text-light); margin: 2rem 0;">
+                    Press <strong style="color: var(--primary);">SPACE</strong> to buzz in
+                </div>
+                <div id="buzz-status" class="buzz-status"></div>
+            </div>
+
+            <div class="answer-section">
+                <input type="text" id="answer-input" placeholder="Buzz first to answer..." disabled>
+                <button id="submit-answer-btn">Submit (Enter)</button>
+                <div id="answer-feedback" class="answer-feedback"></div>
+            </div>
+
+            <div class="controls">
+                <button id="next-tossup-btn">Next Question (N)</button>
+                <button id="skip-tossup-btn">Skip</button>
+                <button id="pause-tossup-btn">Pause</button>
+                <button id="end-tossup-btn">End Session</button>
+            </div>
+        </div>
+
+        <!-- Bonus Game Screen -->
+        <div id="bonus-game" class="screen">
+            <div class="game-header">
+                <div class="header-left">
+                    <div class="stat-pill">Bonuses: <span id="bonus-count">0</span></div>
+                    <div class="stat-pill">Points: <span id="bonus-points">0</span></div>
+                    <div class="stat-pill">PPB: <span id="bonus-ppb">0.0</span></div>
+                </div>
+            </div>
+
+            <div class="bonus-display">
+                <div id="bonus-metadata" class="question-metadata"></div>
+                <div id="bonus-leadin" class="bonus-leadin">Loading bonus...</div>
+                
+                <div class="bonus-parts">
+                    <div class="bonus-part" id="part-0">
+                        <div class="part-label">[10] Part 1</div>
+                        <div class="part-question"></div>
+                        <input type="text" class="part-answer" placeholder="Your answer...">
+                        <button class="part-submit">Submit</button>
+                        <div class="part-feedback"></div>
+                    </div>
+                    <div class="bonus-part" id="part-1">
+                        <div class="part-label">[10] Part 2</div>
+                        <div class="part-question"></div>
+                        <input type="text" class="part-answer" placeholder="Your answer...">
+                        <button class="part-submit">Submit</button>
+                        <div class="part-feedback"></div>
+                    </div>
+                    <div class="bonus-part" id="part-2">
+                        <div class="part-label">[10] Part 3</div>
+                        <div class="part-question"></div>
+                        <input type="text" class="part-answer" placeholder="Your answer...">
+                        <button class="part-submit">Submit</button>
+                        <div class="part-feedback"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button id="next-bonus-btn">Next Bonus (N)</button>
+                <button id="end-bonus-btn">End Session</button>
+            </div>
+        </div>
+
+        <!-- Database Screen -->
+        <div id="database" class="screen">
+            <h2>Question Database</h2>
+            <div class="search-panel">
+                <p style="text-align:center; color:var(--text-light); padding:2rem;">
+                    Database search feature coming soon! This will allow you to search through thousands of quiz bowl questions by keyword, category, and difficulty.
+                </p>
+            </div>
+        </div>
+
+        <!-- Statistics Screen -->
+        <div id="statistics" class="screen">
+            <h2>Your Statistics</h2>
+            <div class="stats-container">
+                <div class="stats-section">
+                    <h3>Tossup Stats</h3>
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <div class="stat-value" id="tossups-played">0</div>
+                            <div class="stat-label">Played</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="tossups-correct">0</div>
+                            <div class="stat-label">Correct</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="tossups-incorrect">0</div>
+                            <div class="stat-label">Incorrect</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="tossup-accuracy">0%</div>
+                            <div class="stat-label">Accuracy</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="stats-section">
+                    <h3>Bonus Stats</h3>
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <div class="stat-value" id="bonuses-played">0</div>
+                            <div class="stat-label">Played</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="bonus-points-total">0</div>
+                            <div class="stat-label">Total Points</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="bonus-parts-correct">0</div>
+                            <div class="stat-label">Parts Correct</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="bonus-ppb-avg">0.0</div>
+                            <div class="stat-label">Avg PPB</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Screen -->
+        <div id="settings" class="screen">
+            <h2>Settings</h2>
+            <div class="settings-panel">
+                <div class="setting-item">
+                    <label for="reading-speed">Reading Speed (Words Per Minute)</label>
+                    <div class="slider-container">
+                        <input type="range" id="reading-speed" min="50" max="500" value="250" step="10">
+                        <span id="speed-value">250 WPM</span>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="auto-reveal" checked>
+                        Auto-reveal answer at end of question
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="show-metadata" checked>
+                        Show question metadata (category, difficulty, tournament)
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="standard-only">
+                        Standard format only questions
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <button class="start-btn" id="save-settings-btn">Save Settings</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Multiplayer Screen (Placeholder) -->
+        <div id="multiplayer-setup" class="screen">
+            <h2>Multiplayer Mode</h2>
+            <div class="setup-panel">
+                <p style="text-align:center; color:var(--text-light); padding:2rem;">
+                    Multiplayer mode coming soon! You'll be able to create rooms, invite friends, and compete in real-time quiz bowl matches.
+                </p>
+            </div>
+            <div class="button-group">
+                <button class="back-btn" id="back-to-home-mp">Back to Home</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
