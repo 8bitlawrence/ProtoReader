@@ -6,6 +6,10 @@ const CONFIG = {
     API_BASE: 'https://www.qbreader.org/api',
     DEFAULT_READING_SPEED: 250, // Words per minute
     TIMER_DURATION: 5, // Seconds for answering
+    POWER_THRESHOLD: 0.33, // Fraction of question for power
+    POWER_POINTS: 15,
+    NORMAL_POINTS: 10,
+    NEG_POINTS: -5,
     CATEGORIES: [
         'Literature', 'History', 'Science', 'Fine Arts',
         'Religion', 'Mythology', 'Philosophy', 'Social Science',
@@ -25,7 +29,17 @@ const CONFIG = {
         'Other Academic': ['Other Academic'],
         'Trash': ['Trash']
     },
-    DIFFICULTIES: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    DIFFICULTIES: [
+        { display: 'Middle School', value: 1 },
+        { display: 'Easy High School', value: 2 },
+        { display: 'Regular High School', value: 3 },
+        { display: 'Hard High School', value: 4 },
+        { display: 'National High School', value: 5 },
+        { display: 'Easy College', value: 6 },
+        { display: 'Regular College', value: 7 },
+        { display: 'Hard College', value: 8 },
+        { display: 'Open', value: 9 }
+    ]
 };
 
 // ==================== State Management ====================
@@ -35,8 +49,12 @@ const state = {
     currentQuestion: null,
     questionIndex: 0,
     readingPosition: 0,
+    currentQuestionWordCount: 0,
+    buzzPosition: 0,
     readingInterval: null,
     timerInterval: null,
+    buzzWindowInterval: null,
+    buzzWindowTime: 5,
     timeRemaining: CONFIG.TIMER_DURATION,
     buzzed: false,
     answered: false,
@@ -54,7 +72,7 @@ const state = {
         standardOnly: false
     },
     stats: {
-        tossups: { correct: 0, incorrect: 0, played: 0 },
+        tossups: { correct: 0, incorrect: 0, played: 0, score: 0, powers: 0, normals: 0, negs: 0, dead: 0 },
         bonuses: { points: 0, partsCorrect: 0, partsPlayed: 0, played: 0 },
         categories: {}
     },
@@ -74,6 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeFilters();
     initializeSettings();
     initializeKeyboardControls();
+    initializeSidebarToggle();
     loadSettings();
     loadStatistics();
     showScreen('home');
@@ -153,8 +172,9 @@ function initializeFilters() {
     CONFIG.DIFFICULTIES.forEach(diff => {
         const pill = document.createElement('div');
         pill.className = 'pill';
-        pill.textContent = diff;
-        pill.addEventListener('click', () => togglePill(pill, diff, 'difficulties'));
+        pill.textContent = diff.display;
+        pill.dataset.value = diff.value;
+        pill.addEventListener('click', () => togglePill(pill, diff.value, 'difficulties'));
         difficultyPills.appendChild(pill);
     });
 
@@ -172,8 +192,9 @@ function initializeFilters() {
     CONFIG.DIFFICULTIES.forEach(diff => {
         const pill = document.createElement('div');
         pill.className = 'pill';
-        pill.textContent = diff;
-        pill.addEventListener('click', () => togglePill(pill, diff, 'difficulties'));
+        pill.textContent = diff.display;
+        pill.dataset.value = diff.value;
+        pill.addEventListener('click', () => togglePill(pill, diff.value, 'difficulties'));
         bonusDifficultyPills.appendChild(pill);
     });
 
@@ -204,6 +225,7 @@ function startTossupPractice() {
     state.questionIndex = 0;
     state.filters.yearStart = parseInt(document.getElementById('year-start').value) || 2010;
     state.filters.yearEnd = parseInt(document.getElementById('year-end').value) || 2024;
+    resetBuzzLog();
     
     showScreen('tossup-game');
     loadNextTossup();
@@ -244,9 +266,16 @@ async function fetchTossup() {
 
     const url = `${CONFIG.API_BASE}/random-tossup?${params.toString()}`;
     console.log('Fetching tossup from:', url);
+    console.log('Filters:', state.filters);
     
     const response = await fetch(url);
     console.log('Response status:', response.status);
+    
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error Response:', errorText);
+        throw new Error(`API returned ${response.status}: ${errorText}`);
+    }
     
     const data = await response.json();
     console.log('Received data:', data);
@@ -264,7 +293,10 @@ function displayTossupQuestion() {
     const textEl = document.getElementById('question-text');
     
     if (state.settings.showMetadata) {
-        metadataEl.textContent = `${question.category} | ${question.subcategory} | Difficulty ${question.difficulty} | ${question.tournament} ${question.year}`;
+        // Convert difficulty number to display name
+        const difficultyObj = CONFIG.DIFFICULTIES.find(d => d.value === question.difficulty);
+        const difficultyName = difficultyObj ? difficultyObj.display : question.difficulty;
+        metadataEl.textContent = `${question.category} | ${question.subcategory} | ${difficultyName} | ${question.tournament} ${question.year}`;
         metadataEl.style.display = 'block';
     } else {
         metadataEl.style.display = 'none';
@@ -278,6 +310,7 @@ function startReading() {
     const question = state.currentQuestion;
     const cleanText = stripHtmlTags(question.question);
     const words = cleanText.split(' ');
+    state.currentQuestionWordCount = words.length;
     const wordsPerSecond = state.settings.readingSpeed / 60;
     const intervalMs = 1000 / wordsPerSecond;
     
@@ -297,9 +330,8 @@ function startReading() {
             document.getElementById('progress-fill').style.width = `${progress}%`;
         } else {
             stopReading();
-            if (state.settings.autoReveal) {
-                revealAnswer();
-            }
+            // Start 5-second buzz window instead of immediately revealing
+            startBuzzWindow();
         }
     }, intervalMs);
 }
@@ -311,11 +343,48 @@ function stopReading() {
     }
 }
 
+function startBuzzWindow() {
+    state.buzzWindowTime = 5;
+    updateBuzzWindowDisplay();
+    
+    state.buzzWindowInterval = setInterval(() => {
+        state.buzzWindowTime--;
+        updateBuzzWindowDisplay();
+        
+        if (state.buzzWindowTime <= 0) {
+            stopBuzzWindow();
+            // Time's up - mark as incorrect and reveal answer
+            document.getElementById('answer-feedback').textContent = 'Time expired - No buzz';
+            document.getElementById('answer-feedback').className = 'answer-feedback incorrect';
+            state.answered = true;
+            recordTossupResult('dead');
+            revealAnswer();
+        }
+    }, 1000);
+}
+
+function stopBuzzWindow() {
+    if (state.buzzWindowInterval) {
+        clearInterval(state.buzzWindowInterval);
+        state.buzzWindowInterval = null;
+    }
+    document.getElementById('buzz-status').textContent = '';
+}
+
+function updateBuzzWindowDisplay() {
+    const statusEl = document.getElementById('buzz-status');
+    statusEl.textContent = `Question complete! Press SPACE to buzz (${state.buzzWindowTime}s remaining)`;
+    statusEl.style.color = state.buzzWindowTime <= 2 ? 'var(--danger)' : 'var(--primary)';
+    statusEl.style.fontWeight = '600';
+}
+
 function buzz() {
     if (state.buzzed || state.answered) return;
     
     state.buzzed = true;
+    state.buzzPosition = state.readingPosition;
     stopReading();
+    stopBuzzWindow();
     
     document.getElementById('buzz-status').textContent = 'Buzzed! Enter your answer:';
     document.getElementById('buzz-status').style.color = 'var(--warning)';
@@ -372,22 +441,43 @@ async function submitAnswer() {
         document.getElementById('answer-feedback').className = 'answer-feedback incorrect';
         state.answered = true;
         stopTimer();
-        updateStats(false);
+        recordTossupResult('neg');
+        appendBuzzLog({
+            correct: false,
+            userAnswer: '(no answer)',
+            correctAnswer: stripHtmlTags(state.currentQuestion.answer),
+            outcome: 'neg'
+        });
         revealAnswer();
         return;
     }
     
     try {
         const result = await checkAnswer(userAnswer);
+        const correct = result.directive?.toLowerCase() === 'accept';
+        const outcome = getTossupOutcome(correct);
         displayAnswerFeedback(result);
-        updateStats(result.directive?.toLowerCase() === 'accept');
+        recordTossupResult(outcome);
+        appendBuzzLog({
+            correct,
+            userAnswer,
+            correctAnswer: stripHtmlTags(state.currentQuestion.answer),
+            outcome
+        });
     } catch (error) {
         console.error('Error checking answer:', error);
         // Fallback to simple matching - case insensitive
         const cleanAnswer = stripHtmlTags(state.currentQuestion.answer).toLowerCase();
         const correct = userAnswer.toLowerCase().includes(cleanAnswer.slice(0, 5));
         displayAnswerFeedback({ correct, directive: correct ? 'accept' : 'reject' });
-        updateStats(correct);
+        const outcome = getTossupOutcome(correct);
+        recordTossupResult(outcome);
+        appendBuzzLog({
+            correct,
+            userAnswer,
+            correctAnswer: stripHtmlTags(state.currentQuestion.answer),
+            outcome
+        });
     }
     
     state.answered = true;
@@ -415,11 +505,71 @@ function displayAnswerFeedback(result) {
     const directive = result.directive.toLowerCase();
     
     if (directive === 'accept') {
-        feedbackEl.textContent = '✓ Correct!';
+        const powerTag = isPowerBuzz() ? ' (Power)' : '';
+        feedbackEl.textContent = `✓ Correct${powerTag}!`;
         feedbackEl.className = 'answer-feedback correct';
     } else {
         feedbackEl.textContent = '✗ Incorrect';
         feedbackEl.className = 'answer-feedback incorrect';
+    }
+}
+
+function resetBuzzLog() {
+    const log = document.getElementById('buzz-log');
+    if (!log) return;
+    log.innerHTML = '';
+    const empty = document.createElement('div');
+    empty.className = 'buzz-log-empty';
+    empty.textContent = 'No buzzes yet.';
+    log.appendChild(empty);
+}
+
+function appendBuzzLog({ correct, userAnswer, correctAnswer, outcome }) {
+    const log = document.getElementById('buzz-log');
+    if (!log) return;
+
+    const empty = log.querySelector('.buzz-log-empty');
+    if (empty) {
+        empty.remove();
+    }
+
+    const item = document.createElement('div');
+    item.className = `buzz-log-item ${correct ? 'correct' : 'incorrect'}`;
+
+    const icon = document.createElement('span');
+    icon.className = 'buzz-log-icon';
+    icon.textContent = correct ? '✓' : '✗';
+
+    const body = document.createElement('div');
+    body.className = 'buzz-log-body';
+
+    const line1 = document.createElement('div');
+    line1.className = 'buzz-log-line';
+    line1.textContent = `You: ${userAnswer}`;
+
+    const line2 = document.createElement('div');
+    line2.className = 'buzz-log-line';
+    line2.textContent = `Answer: ${correctAnswer}`;
+
+    const meta = document.createElement('div');
+    meta.className = 'buzz-log-meta';
+    meta.textContent = formatOutcomeLabel(outcome);
+
+    body.append(line1, line2, meta);
+    item.append(icon, body);
+    log.prepend(item);
+}
+
+function formatOutcomeLabel(outcome) {
+    switch (outcome) {
+        case 'power':
+            return 'Power +15';
+        case 'normal':
+            return 'Correct +10';
+        case 'neg':
+            return 'Neg -5';
+        default:
+            return '';
     }
 }
 
@@ -443,21 +593,48 @@ function revealAnswer() {
     }
 }
 
-function updateStats(correct) {
+function getTossupOutcome(correct) {
+    if (!state.buzzed) return 'dead';
+    if (!correct) return 'neg';
+    return isPowerBuzz() ? 'power' : 'normal';
+}
+
+function isPowerBuzz() {
+    const threshold = Math.max(1, Math.floor(state.currentQuestionWordCount * CONFIG.POWER_THRESHOLD));
+    return state.buzzed && state.buzzPosition > 0 && state.buzzPosition <= threshold;
+}
+
+function recordTossupResult(outcome) {
     state.stats.tossups.played++;
-    if (correct) {
-        state.stats.tossups.correct++;
-    } else {
-        state.stats.tossups.incorrect++;
+    switch (outcome) {
+        case 'power':
+            state.stats.tossups.correct++;
+            state.stats.tossups.powers++;
+            state.stats.tossups.score += CONFIG.POWER_POINTS;
+            break;
+        case 'normal':
+            state.stats.tossups.correct++;
+            state.stats.tossups.normals++;
+            state.stats.tossups.score += CONFIG.NORMAL_POINTS;
+            break;
+        case 'neg':
+            state.stats.tossups.incorrect++;
+            state.stats.tossups.negs++;
+            state.stats.tossups.score += CONFIG.NEG_POINTS;
+            break;
+        case 'dead':
+        default:
+            state.stats.tossups.dead++;
+            break;
     }
     
     const category = state.currentQuestion.category;
     if (!state.stats.categories[category]) {
         state.stats.categories[category] = { correct: 0, incorrect: 0 };
     }
-    if (correct) {
+    if (outcome === 'power' || outcome === 'normal') {
         state.stats.categories[category].correct++;
-    } else {
+    } else if (outcome === 'neg') {
         state.stats.categories[category].incorrect++;
     }
     
@@ -466,19 +643,19 @@ function updateStats(correct) {
 }
 
 function updateGameStats() {
-    document.getElementById('question-count').textContent = state.questionIndex;
     document.getElementById('correct-count').textContent = state.stats.tossups.correct;
-    const accuracy = state.stats.tossups.played > 0 
-        ? Math.round((state.stats.tossups.correct / state.stats.tossups.played) * 100)
-        : 0;
-    document.getElementById('accuracy').textContent = `${accuracy}%`;
+    document.getElementById('score-total').textContent = state.stats.tossups.score;
 }
 
 function resetQuestionState() {
     state.readingPosition = 0;
+    state.currentQuestionWordCount = 0;
     state.buzzed = false;
     state.answered = false;
+    state.buzzPosition = 0;
     state.timeRemaining = CONFIG.TIMER_DURATION;
+    state.buzzWindowTime = 5;
+    stopBuzzWindow();
     
     document.getElementById('buzz-status').textContent = '';
     document.getElementById('buzz-status').style.color = '';
@@ -560,8 +737,11 @@ async function fetchBonus() {
 function displayBonus() {
     const bonus = state.currentQuestion;
     
+    // Convert difficulty number to display name
+    const difficultyObj = CONFIG.DIFFICULTIES.find(d => d.value === bonus.difficulty);
+    const difficultyName = difficultyObj ? difficultyObj.display : bonus.difficulty;
     document.getElementById('bonus-metadata').textContent = 
-        `${bonus.category} | ${bonus.subcategory} | Difficulty ${bonus.difficulty} | ${bonus.tournament} ${bonus.year}`;
+        `${bonus.category} | ${bonus.subcategory} | ${difficultyName} | ${bonus.tournament} ${bonus.year}`;
     
     document.getElementById('bonus-leadin').textContent = stripHtmlTags(bonus.leadin);
     
@@ -674,7 +854,7 @@ function initializeSettings() {
     if (gameSpeedSlider) {
         gameSpeedSlider.addEventListener('input', (e) => {
             state.settings.readingSpeed = parseInt(e.target.value);
-            document.getElementById('game-speed-value').textContent = e.target.value;
+            document.getElementById('game-speed-value').textContent = `${e.target.value} WPM`;
         });
     }
     
@@ -705,7 +885,7 @@ function loadSettings() {
         const gameSpeed = document.getElementById('game-speed');
         if (gameSpeed) {
             gameSpeed.value = state.settings.readingSpeed;
-            document.getElementById('game-speed-value').textContent = state.settings.readingSpeed;
+            document.getElementById('game-speed-value').textContent = `${state.settings.readingSpeed} WPM`;
         }
         document.getElementById('auto-reveal').checked = state.settings.autoReveal;
         document.getElementById('show-metadata').checked = state.settings.showMetadata;
@@ -721,7 +901,13 @@ function saveSettings() {
 function loadStatistics() {
     const saved = localStorage.getItem('protoreader-stats');
     if (saved) {
-        state.stats = JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        state.stats = {
+            ...state.stats,
+            ...parsed,
+            tossups: { ...state.stats.tossups, ...parsed.tossups },
+            bonuses: { ...state.stats.bonuses, ...parsed.bonuses }
+        };
     }
     displayStatistics();
 }
@@ -748,6 +934,41 @@ function displayStatistics() {
         ? (state.stats.bonuses.points / state.stats.bonuses.played).toFixed(1)
         : '0.0';
     document.getElementById('bonus-ppb-avg').textContent = bonusPPB;
+}
+
+// ==================== Sidebar Toggle ====================
+function initializeSidebarToggle() {
+    // Tossup sidebar toggle
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const sidebar = document.getElementById('game-sidebar');
+    
+    if (sidebarToggle && sidebar) {
+        sidebarToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+            const icon = sidebarToggle.querySelector('.toggle-icon');
+            if (sidebar.classList.contains('collapsed')) {
+                icon.textContent = '▶';
+            } else {
+                icon.textContent = '◀';
+            }
+        });
+    }
+    
+    // Bonus sidebar toggle
+    const bonusSidebarToggle = document.getElementById('bonus-sidebar-toggle');
+    const bonusSidebar = document.getElementById('bonus-sidebar');
+    
+    if (bonusSidebarToggle && bonusSidebar) {
+        bonusSidebarToggle.addEventListener('click', () => {
+            bonusSidebar.classList.toggle('collapsed');
+            const icon = bonusSidebarToggle.querySelector('.toggle-icon');
+            if (bonusSidebar.classList.contains('collapsed')) {
+                icon.textContent = '▶';
+            } else {
+                icon.textContent = '◀';
+            }
+        });
+    }
 }
 
 // ==================== Keyboard Controls ====================
@@ -781,12 +1002,7 @@ function initializeKeyboardControls() {
     // Submit answer button
     document.getElementById('submit-answer-btn').addEventListener('click', submitAnswer);
     
-    // Answer input Enter key
-    document.getElementById('answer-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            submitAnswer();
-        }
-    });
+    // Answer input Enter key handled by keydown listener
     
     // Control buttons
     document.getElementById('next-tossup-btn').addEventListener('click', loadNextTossup);

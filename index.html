@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ProtoReader - Quiz Bowl Practice</title>
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -109,95 +110,134 @@
 
         <!-- Tossup Game Screen -->
         <div id="tossup-game" class="screen">
-            <div class="game-header">
-                <div class="header-left">
-                    <div class="stat-pill">Questions: <span id="question-count">0</span></div>
-                    <div class="stat-pill">Correct: <span id="correct-count">0</span></div>
-                    <div class="stat-pill">Accuracy: <span id="accuracy">0%</span></div>
-                </div>
-                <div style="display: flex; gap: 1rem; align-items: center;">
-                    <label for="game-speed" style="font-weight: 600; color: var(--text);">Speed:</label>
-                    <input type="range" id="game-speed" min="50" max="500" value="250" step="10" style="width: 120px;">
-                    <span id="game-speed-value" style="font-weight: 600; color: var(--primary); min-width: 50px;">250</span>
-                </div>
-                <div class="header-right">
-                    <div class="timer-display">
-                        <div id="timer" class="timer">5.0</div>
+            <div class="game-container">
+                <!-- Main content area - Question and Answer -->
+                <div class="game-main">
+                    <div class="question-display">
+                        <div id="question-metadata" class="question-metadata"></div>
+                        <div id="question-text" class="question-text">Loading question...</div>
+                        <div class="progress-bar">
+                            <div id="progress-fill" class="progress-fill"></div>
+                        </div>
+                    </div>
+
+                    <div class="buzz-log-panel">
+                        <h3>Buzz Log</h3>
+                        <div id="buzz-log" class="buzz-log">
+                            <div class="buzz-log-empty">No buzzes yet.</div>
+                        </div>
+                    </div>
+
+                    <div class="answer-section">
+                        <input type="text" id="answer-input" placeholder="Buzz first to answer..." disabled>
+                        <button id="submit-answer-btn">Submit (Enter)</button>
+                        <div id="answer-feedback" class="answer-feedback"></div>
                     </div>
                 </div>
-            </div>
 
-            <div class="question-display">
-                <div id="question-metadata" class="question-metadata"></div>
-                <div id="question-text" class="question-text">Loading question...</div>
-                <div class="progress-bar">
-                    <div id="progress-fill" class="progress-fill"></div>
+                <!-- Collapsible Sidebar - Stats and Controls -->
+                <div class="game-sidebar" id="game-sidebar">
+                    <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle sidebar">
+                        <span class="toggle-icon">◀</span>
+                    </button>
+
+                    <div class="sidebar-content">
+                        <div class="game-header">
+                            <div class="header-section">
+                                <h3 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-light);">Statistics</h3>
+                                <div class="stat-pill">Score: <span id="score-total">0</span></div>
+                                <div class="stat-pill">Correct: <span id="correct-count">0</span></div>
+                            </div>
+                            <div class="header-section">
+                                <h3 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-light);">Reading Speed</h3>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <input type="range" id="game-speed" min="50" max="500" value="250" step="10" style="flex: 1;">
+                                    <span id="game-speed-value" style="font-weight: 600; color: var(--primary); min-width: 60px;">250 WPM</span>
+                                </div>
+                            </div>
+                            <div class="header-section">
+                                <h3 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-light);">Timer</h3>
+                                <div class="timer-display">
+                                    <div id="timer" class="timer">5.0</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="buzz-section">
+                            <div style="text-align: center; font-size: 1rem; color: var(--text-light); margin: 1rem 0;">
+                                Press <strong style="color: var(--primary);">SPACE</strong> to buzz in
+                            </div>
+                            <div id="buzz-status" class="buzz-status"></div>
+                        </div>
+
+                        <div class="controls">
+                            <button id="next-tossup-btn">Next Question (N)</button>
+                            <button id="skip-tossup-btn">Skip</button>
+                            <button id="pause-tossup-btn">Pause</button>
+                            <button id="end-tossup-btn">End Session</button>
+                        </div>
+                    </div>
                 </div>
-            </div>
-
-            <div class="buzz-section">
-                <div style="text-align: center; font-size: 1.2rem; color: var(--text-light); margin: 2rem 0;">
-                    Press <strong style="color: var(--primary);">SPACE</strong> to buzz in
-                </div>
-                <div id="buzz-status" class="buzz-status"></div>
-            </div>
-
-            <div class="answer-section">
-                <input type="text" id="answer-input" placeholder="Buzz first to answer..." disabled>
-                <button id="submit-answer-btn">Submit (Enter)</button>
-                <div id="answer-feedback" class="answer-feedback"></div>
-            </div>
-
-            <div class="controls">
-                <button id="next-tossup-btn">Next Question (N)</button>
-                <button id="skip-tossup-btn">Skip</button>
-                <button id="pause-tossup-btn">Pause</button>
-                <button id="end-tossup-btn">End Session</button>
             </div>
         </div>
 
         <!-- Bonus Game Screen -->
         <div id="bonus-game" class="screen">
-            <div class="game-header">
-                <div class="header-left">
-                    <div class="stat-pill">Bonuses: <span id="bonus-count">0</span></div>
-                    <div class="stat-pill">Points: <span id="bonus-points">0</span></div>
-                    <div class="stat-pill">PPB: <span id="bonus-ppb">0.0</span></div>
-                </div>
-            </div>
-
-            <div class="bonus-display">
-                <div id="bonus-metadata" class="question-metadata"></div>
-                <div id="bonus-leadin" class="bonus-leadin">Loading bonus...</div>
-                
-                <div class="bonus-parts">
-                    <div class="bonus-part" id="part-0">
-                        <div class="part-label">[10] Part 1</div>
-                        <div class="part-question"></div>
-                        <input type="text" class="part-answer" placeholder="Your answer...">
-                        <button class="part-submit">Submit</button>
-                        <div class="part-feedback"></div>
-                    </div>
-                    <div class="bonus-part" id="part-1">
-                        <div class="part-label">[10] Part 2</div>
-                        <div class="part-question"></div>
-                        <input type="text" class="part-answer" placeholder="Your answer...">
-                        <button class="part-submit">Submit</button>
-                        <div class="part-feedback"></div>
-                    </div>
-                    <div class="bonus-part" id="part-2">
-                        <div class="part-label">[10] Part 3</div>
-                        <div class="part-question"></div>
-                        <input type="text" class="part-answer" placeholder="Your answer...">
-                        <button class="part-submit">Submit</button>
-                        <div class="part-feedback"></div>
+            <div class="game-container">
+                <!-- Main content area - Bonus Questions -->
+                <div class="game-main">
+                    <div class="bonus-display">
+                        <div id="bonus-metadata" class="question-metadata"></div>
+                        <div id="bonus-leadin" class="bonus-leadin">Loading bonus...</div>
+                        
+                        <div class="bonus-parts">
+                            <div class="bonus-part" id="part-0">
+                                <div class="part-label">[10] Part 1</div>
+                                <div class="part-question"></div>
+                                <input type="text" class="part-answer" placeholder="Your answer...">
+                                <button class="part-submit">Submit</button>
+                                <div class="part-feedback"></div>
+                            </div>
+                            <div class="bonus-part" id="part-1">
+                                <div class="part-label">[10] Part 2</div>
+                                <div class="part-question"></div>
+                                <input type="text" class="part-answer" placeholder="Your answer...">
+                                <button class="part-submit">Submit</button>
+                                <div class="part-feedback"></div>
+                            </div>
+                            <div class="bonus-part" id="part-2">
+                                <div class="part-label">[10] Part 3</div>
+                                <div class="part-question"></div>
+                                <input type="text" class="part-answer" placeholder="Your answer...">
+                                <button class="part-submit">Submit</button>
+                                <div class="part-feedback"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="controls">
-                <button id="next-bonus-btn">Next Bonus (N)</button>
-                <button id="end-bonus-btn">End Session</button>
+                <!-- Collapsible Sidebar - Stats and Controls -->
+                <div class="game-sidebar" id="bonus-sidebar">
+                    <button class="sidebar-toggle" id="bonus-sidebar-toggle" title="Toggle sidebar">
+                        <span class="toggle-icon">◀</span>
+                    </button>
+
+                    <div class="sidebar-content">
+                        <div class="game-header">
+                            <div class="header-section">
+                                <h3 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-light);">Statistics</h3>
+                                <div class="stat-pill">Bonuses: <span id="bonus-count">0</span></div>
+                                <div class="stat-pill">Points: <span id="bonus-points">0</span></div>
+                                <div class="stat-pill">PPB: <span id="bonus-ppb">0.0</span></div>
+                            </div>
+                        </div>
+
+                        <div class="controls">
+                            <button id="next-bonus-btn">Next Bonus (N)</button>
+                            <button id="end-bonus-btn">End Session</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
