@@ -110,22 +110,21 @@ const state = {
 document.addEventListener('DOMContentLoaded', () => {
     loadAuthState();
     
-    if (!state.auth.isLoggedIn) {
-        showScreen('login');
-        initializeAuthPage();
-    } else {
-        showScreen('home');
-        initializeNavigation();
-        initializeModeCards();
-        initializeFilters();
-        initializeSettings();
-        initializeKeyboardControls();
-        initializeSidebarToggle();
-        initializeMultiplayer();
-        loadSettings();
-        loadStatistics();
-        updateNavbarForLoggedIn();
-    }
+    // Always show home page and initialize
+    showScreen('home');
+    initializeNavigation();
+    initializeModeCards();
+    initializeFilters();
+    initializeSettings();
+    initializeKeyboardControls();
+    initializeSidebarToggle();
+    initializeMultiplayer();
+    loadSettings();
+    loadStatistics();
+    initializeAuthPage();
+    
+    // Update navbar based on login status
+    updateNavbar();
 });
 
 // ==================== Authentication ====================
@@ -179,7 +178,7 @@ function handleLogin() {
     initializeMultiplayer();
     loadSettings();
     loadStatistics();
-    updateNavbarForLoggedIn();
+    updateNavbar();
 }
 
 function handleSignup() {
@@ -233,7 +232,7 @@ function handleSignup() {
     initializeMultiplayer();
     loadSettings();
     loadStatistics();
-    updateNavbarForLoggedIn();
+    updateNavbar();
 }
 
 function setAuthError(message) {
@@ -257,6 +256,19 @@ function loadAuthState() {
         state.auth.isLoggedIn = auth.isLoggedIn;
         state.auth.currentUser = auth.currentUser;
         state.auth.profilePicture = auth.profilePicture;
+    }
+}
+
+function updateNavbar() {
+    const loginLink = document.getElementById('login-link');
+    const profileMenu = document.getElementById('profile-menu');
+    
+    if (state.auth.isLoggedIn) {
+        updateNavbarForLoggedIn();
+    } else {
+        // Show login link, hide profile menu
+        loginLink.style.display = 'block';
+        profileMenu.style.display = 'none';
     }
 }
 
@@ -407,7 +419,7 @@ function initializeAccountSettings() {
         saveAuthState();
         
         // Update navbar
-        updateNavbarForLoggedIn();
+        updateNavbar();
         
         // Clear fields and show success
         newUsernameField.value = '';
