@@ -26,6 +26,16 @@ function generateRoomCode() {
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
+    socket.on('getRooms', () => {
+        const roomsList = Array.from(rooms.values()).map(room => ({
+            code: room.code,
+            playerCount: room.players.length,
+            gameStarted: room.gameStarted,
+            hostName: room.players.find(p => p.isHost)?.name || 'Unknown'
+        }));
+        socket.emit('roomsList', roomsList);
+    });
+
     socket.on('createRoom', (data) => {
         const roomCode = generateRoomCode();
         const room = {
@@ -56,11 +66,6 @@ io.on('connection', (socket) => {
 
         if (!room) {
             socket.emit('error', 'Room not found');
-            return;
-        }
-
-        if (room.gameStarted) {
-            socket.emit('error', 'Game already in progress');
             return;
         }
 

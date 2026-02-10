@@ -69,7 +69,10 @@ const state = {
         readingSpeed: CONFIG.DEFAULT_READING_SPEED,
         autoReveal: true,
         showMetadata: true,
-        standardOnly: false
+        standardOnly: false,
+        themeMode: 'light',
+        glowEffect: 'none',
+        strictness: 1  // 0=lenient, 1=normal, 2=strict
     },
     stats: {
         tossups: { correct: 0, incorrect: 0, played: 0, score: 0, powers: 0, normals: 0, negs: 0, dead: 0 },
@@ -81,24 +84,385 @@ const state = {
         roomCode: null,
         playerName: null,
         isHost: false,
-        players: []
+        players: [],
+        currentQuestion: 0,
+        questions: [],
+        currentQuestionData: null,
+        readingPosition: 0,
+        currentQuestionWordCount: 0,
+        buzzPosition: 0,
+        buzzed: false,
+        answered: false,
+        readingInterval: null,
+        timerInterval: null,
+        buzzWindowInterval: null,
+        buzzWindowTime: 5,
+        timeRemaining: CONFIG.TIMER_DURATION
+    },
+    auth: {
+        isLoggedIn: false,
+        currentUser: null,
+        profilePicture: null
     }
 };
 
 // ==================== Initialization ====================
 document.addEventListener('DOMContentLoaded', () => {
+    loadAuthState();
+    
+    if (!state.auth.isLoggedIn) {
+        showScreen('login');
+        initializeAuthPage();
+    } else {
+        showScreen('home');
+        initializeNavigation();
+        initializeModeCards();
+        initializeFilters();
+        initializeSettings();
+        initializeKeyboardControls();
+        initializeSidebarToggle();
+        initializeMultiplayer();
+        loadSettings();
+        loadStatistics();
+        updateNavbarForLoggedIn();
+    }
+});
+
+// ==================== Authentication ====================
+function initializeAuthPage() {
+    document.getElementById('login-btn').addEventListener('click', handleLogin);
+    document.getElementById('signup-btn').addEventListener('click', handleSignup);
+    
+    document.getElementById('auth-username').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleLogin();
+    });
+    
+    document.getElementById('auth-password').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleLogin();
+    });
+}
+
+function handleLogin() {
+    const username = document.getElementById('auth-username').value.trim();
+    const password = document.getElementById('auth-password').value;
+    const errorDiv = document.getElementById('auth-error');
+    
+    if (!username || !password) {
+        setAuthError('Please enter both username and password');
+        return;
+    }
+    
+    const users = JSON.parse(localStorage.getItem('protoreader-users') || '{}');
+    
+    if (!users[username] || users[username].password !== password) {
+        setAuthError('Invalid username or password');
+        return;
+    }
+    
+    // Login successful
+    state.auth.isLoggedIn = true;
+    state.auth.currentUser = username;
+    saveAuthState();
+    
+    errorDiv.style.display = 'none';
+    document.getElementById('auth-username').value = '';
+    document.getElementById('auth-password').value = '';
+    
+    // Reinitialize the app
+    showScreen('home');
     initializeNavigation();
     initializeModeCards();
     initializeFilters();
     initializeSettings();
     initializeKeyboardControls();
     initializeSidebarToggle();
+    initializeMultiplayer();
     loadSettings();
     loadStatistics();
-    showScreen('home');
-});
+    updateNavbarForLoggedIn();
+}
 
-// ==================== Navigation ====================
+function handleSignup() {
+    const username = document.getElementById('auth-username').value.trim();
+    const password = document.getElementById('auth-password').value;
+    const errorDiv = document.getElementById('auth-error');
+    
+    if (!username || !password) {
+        setAuthError('Please enter both username and password');
+        return;
+    }
+    
+    if (username.length < 3) {
+        setAuthError('Username must be at least 3 characters');
+        return;
+    }
+    
+    if (password.length < 4) {
+        setAuthError('Password must be at least 4 characters');
+        return;
+    }
+    
+    const users = JSON.parse(localStorage.getItem('protoreader-users') || '{}');
+    
+    if (users[username]) {
+        setAuthError('Username already exists');
+        return;
+    }
+    
+    // Create account
+    users[username] = { password };
+    localStorage.setItem('protoreader-users', JSON.stringify(users));
+    
+    // Auto-login
+    state.auth.isLoggedIn = true;
+    state.auth.currentUser = username;
+    saveAuthState();
+    
+    errorDiv.style.display = 'none';
+    document.getElementById('auth-username').value = '';
+    document.getElementById('auth-password').value = '';
+    
+    // Reinitialize the app
+    showScreen('home');
+    initializeNavigation();
+    initializeModeCards();
+    initializeFilters();
+    initializeSettings();
+    initializeKeyboardControls();
+    initializeSidebarToggle();
+    initializeMultiplayer();
+    loadSettings();
+    loadStatistics();
+    updateNavbarForLoggedIn();
+}
+
+function setAuthError(message) {
+    const errorDiv = document.getElementById('auth-error');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+}
+
+function saveAuthState() {
+    localStorage.setItem('protoreader-auth', JSON.stringify({
+        isLoggedIn: state.auth.isLoggedIn,
+        currentUser: state.auth.currentUser,
+        profilePicture: state.auth.profilePicture
+    }));
+}
+
+function loadAuthState() {
+    const saved = localStorage.getItem('protoreader-auth');
+    if (saved) {
+        const auth = JSON.parse(saved);
+        state.auth.isLoggedIn = auth.isLoggedIn;
+        state.auth.currentUser = auth.currentUser;
+        state.auth.profilePicture = auth.profilePicture;
+    }
+}
+
+function updateNavbarForLoggedIn() {
+    const loginLink = document.getElementById('login-link');
+    const profileMenu = document.getElementById('profile-menu');
+    const profileBtn = document.getElementById('profile-btn');
+    const profileDropdown = document.getElementById('profile-dropdown');
+    const profileUsername = document.getElementById('profile-username');
+    const profileAvatar = document.getElementById('profile-avatar');
+    const profileInitial = document.getElementById('profile-initial');
+    const profileImg = document.getElementById('profile-img');
+    
+    if (state.auth.isLoggedIn) {
+        loginLink.style.display = 'none';
+        profileMenu.style.display = 'block';
+        
+        profileUsername.textContent = state.auth.currentUser;
+        profileInitial.textContent = state.auth.currentUser[0].toUpperCase();
+        
+        if (state.auth.profilePicture) {
+            profileImg.src = state.auth.profilePicture;
+            profileImg.style.display = 'block';
+            profileInitial.style.display = 'none';
+        }
+        
+        profileBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            profileDropdown.style.display = profileDropdown.style.display === 'none' ? 'block' : 'none';
+        });
+        
+        document.getElementById('logout-nav-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            handleLogout();
+        });
+        
+        document.getElementById('account-settings-link').addEventListener('click', (e) => {
+            e.preventDefault();
+            profileDropdown.style.display = 'none';
+            showScreen('account-settings');
+            initializeAccountSettings();
+        });
+        
+        document.addEventListener('click', (e) => {
+            if (!profileMenu.contains(e.target)) {
+                profileDropdown.style.display = 'none';
+            }
+        });
+    }
+}
+
+function handleLogout() {
+    state.auth.isLoggedIn = false;
+    state.auth.currentUser = null;
+    state.auth.profilePicture = null;
+    saveAuthState();
+    
+    document.getElementById('login-link').style.display = 'block';
+    document.getElementById('profile-menu').style.display = 'none';
+    
+    showScreen('login');
+    document.getElementById('auth-username').value = '';
+    document.getElementById('auth-password').value = '';
+    document.getElementById('auth-error').style.display = 'none';
+}
+
+// ==================== Account Settings ====================
+function initializeAccountSettings() {
+    const profilePicInput = document.getElementById('profile-pic-input');
+    const avatarDisplay = document.getElementById('account-avatar-display');
+    const currentUsername = document.getElementById('account-current-username');
+    const newUsernameField = document.getElementById('account-new-username');
+    const newPasswordField = document.getElementById('account-new-password');
+    const saveBtn = document.getElementById('save-account-btn');
+    const backBtn = document.getElementById('back-from-account');
+    const errorDiv = document.getElementById('account-error');
+    const successDiv = document.getElementById('account-success');
+    
+    // Display current username
+    currentUsername.value = state.auth.currentUser;
+    
+    // Display profile picture
+    displayAccountProfilePicture();
+    
+    // Avatar click to upload
+    avatarDisplay.addEventListener('click', () => {
+        profilePicInput.click();
+    });
+    
+    profilePicInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                state.auth.profilePicture = event.target.result;
+                displayAccountProfilePicture();
+                saveAuthState();
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+    
+    // Save changes button
+    saveBtn.addEventListener('click', () => {
+        errorDiv.style.display = 'none';
+        successDiv.style.display = 'none';
+        
+        const newUsername = newUsernameField.value.trim();
+        const newPassword = newPasswordField.value;
+        
+        // Check if new username is valid
+        if (newUsername && newUsername.length < 3) {
+            setAccountError('New username must be at least 3 characters');
+            return;
+        }
+        
+        // Check if new username already exists
+        if (newUsername && newUsername !== state.auth.currentUser) {
+            const users = JSON.parse(localStorage.getItem('protoreader-users') || '{}');
+            if (users[newUsername]) {
+                setAccountError('Username already taken');
+                return;
+            }
+        }
+        
+        // Check if new password is valid
+        if (newPassword && newPassword.length < 4) {
+            setAccountError('New password must be at least 4 characters');
+            return;
+        }
+        
+        const users = JSON.parse(localStorage.getItem('protoreader-users') || '{}');
+        
+        // Update username if provided
+        if (newUsername && newUsername !== state.auth.currentUser) {
+            users[newUsername] = users[state.auth.currentUser];
+            delete users[state.auth.currentUser];
+            state.auth.currentUser = newUsername;
+        }
+        
+        // Update password if provided
+        if (newPassword) {
+            users[state.auth.currentUser].password = newPassword;
+        }
+        
+        // Save to localStorage
+        localStorage.setItem('protoreader-users', JSON.stringify(users));
+        saveAuthState();
+        
+        // Update navbar
+        updateNavbarForLoggedIn();
+        
+        // Clear fields and show success
+        newUsernameField.value = '';
+        newPasswordField.value = '';
+        
+        setAccountSuccess('Account settings updated successfully!');
+        
+        setTimeout(() => {
+            successDiv.style.display = 'none';
+        }, 3000);
+    });
+    
+    // Back button
+    backBtn.addEventListener('click', () => {
+        showScreen('home');
+    });
+}
+
+function displayAccountProfilePicture() {
+    const avatarDisplay = document.getElementById('account-avatar-display');
+    const avatarInitial = document.getElementById('account-avatar-initial');
+    const avatarImg = document.getElementById('account-avatar-img');
+    const navbarAvatar = document.getElementById('profile-avatar');
+    const navbarInitial = document.getElementById('profile-initial');
+    const navbarImg = document.getElementById('profile-img');
+    
+    avatarInitial.textContent = state.auth.currentUser[0].toUpperCase();
+    navbarInitial.textContent = state.auth.currentUser[0].toUpperCase();
+    
+    if (state.auth.profilePicture) {
+        avatarImg.src = state.auth.profilePicture;
+        avatarImg.style.display = 'block';
+        avatarInitial.style.display = 'none';
+        
+        navbarImg.src = state.auth.profilePicture;
+        navbarImg.style.display = 'block';
+        navbarInitial.style.display = 'none';
+    } else {
+        avatarImg.style.display = 'none';
+        avatarInitial.style.display = 'block';
+        
+        navbarImg.style.display = 'none';
+        navbarInitial.style.display = 'block';
+    }
+}
+
+function setAccountError(message) {
+    document.getElementById('account-error').textContent = message;
+    document.getElementById('account-error').style.display = 'block';
+}
+
+function setAccountSuccess(message) {
+    document.getElementById('account-success').textContent = message;
+    document.getElementById('account-success').style.display = 'block';
+}
 function initializeNavigation() {
     document.querySelectorAll('.nav-menu a').forEach(link => {
         link.addEventListener('click', (e) => {
@@ -151,6 +515,8 @@ function initializeModeCards() {
 
     document.getElementById('multiplayer-mode-card').addEventListener('click', () => {
         state.currentMode = 'multiplayer';
+        document.getElementById('player-name').value = '';
+        initializeMultiplayer(); // Initialize Socket.io when entering multiplayer mode
         showScreen('multiplayer-setup');
     });
 }
@@ -487,12 +853,16 @@ async function submitAnswer() {
 
 async function checkAnswer(userAnswer) {
     const cleanAnswer = stripHtmlTags(state.currentQuestion.answer);
+    const strictnessMap = ['lenient', 'normal', 'strict'];
+    const strictnessLevel = strictnessMap[state.settings.strictness || 1];
+    
     const response = await fetch(`${CONFIG.API_BASE}/check-answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             answerline: cleanAnswer,
-            givenAnswer: userAnswer
+            givenAnswer: userAnswer,
+            strictness: strictnessLevel
         })
     });
     
@@ -778,12 +1148,16 @@ async function submitBonusPart(partIndex) {
     }
     
     try {
+        const strictnessMap = ['lenient', 'normal', 'strict'];
+        const strictnessLevel = strictnessMap[state.settings.strictness || 1];
+        
         const response = await fetch(`${CONFIG.API_BASE}/check-answer`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 answerline: correctAnswer,
-                givenAnswer: userAnswer
+                givenAnswer: userAnswer,
+                strictness: strictnessLevel
             })
         });
         
@@ -858,6 +1232,16 @@ function initializeSettings() {
         });
     }
     
+    // Strictness slider
+    const strictnessSlider = document.getElementById('strictness-slider');
+    if (strictnessSlider) {
+        strictnessSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            state.settings.strictness = value;
+            document.getElementById('strictness-value').textContent = value;
+        });
+    }
+    
     document.getElementById('auto-reveal').addEventListener('change', (e) => {
         state.settings.autoReveal = e.target.checked;
     });
@@ -870,9 +1254,33 @@ function initializeSettings() {
         state.settings.standardOnly = e.target.checked;
     });
     
+    // Theme mode listeners
+    document.getElementById('theme-light').addEventListener('change', (e) => {
+        if (e.target.checked) {
+            state.settings.themeMode = 'light';
+            applyTheme();
+            saveSettings();
+        }
+    });
+    
+    document.getElementById('theme-dark').addEventListener('change', (e) => {
+        if (e.target.checked) {
+            state.settings.themeMode = 'dark';
+            applyTheme();
+            saveSettings();
+        }
+    });
+    
+    // Glow effect listener
+    document.getElementById('glow-color').addEventListener('change', (e) => {
+        state.settings.glowEffect = e.target.value;
+        applyTheme();
+        saveSettings();
+    });
+    
     document.getElementById('save-settings-btn').addEventListener('click', () => {
         saveSettings();
-        alert('Settings saved!');
+        showCustomAlert('Settings saved!');
     });
 }
 
@@ -887,9 +1295,54 @@ function loadSettings() {
             gameSpeed.value = state.settings.readingSpeed;
             document.getElementById('game-speed-value').textContent = `${state.settings.readingSpeed} WPM`;
         }
+        
+        // Load strictness
+        const strictness = state.settings.strictness !== undefined ? state.settings.strictness : 1;
+        const strictnessSlider = document.getElementById('strictness-slider');
+        const strictnessValue = document.getElementById('strictness-value');
+        if (strictnessSlider && strictnessValue) {
+            strictnessSlider.value = strictness;
+            strictnessValue.textContent = strictness;
+        }
+        const multiplayerStrictnessSlider = document.getElementById('multiplayer-strictness-slider');
+        const multiplayerStrictnessValue = document.getElementById('multiplayer-strictness-value');
+        if (multiplayerStrictnessSlider && multiplayerStrictnessValue) {
+            multiplayerStrictnessSlider.value = strictness;
+            multiplayerStrictnessValue.textContent = strictness;
+        }
+        
         document.getElementById('auto-reveal').checked = state.settings.autoReveal;
         document.getElementById('show-metadata').checked = state.settings.showMetadata;
         document.getElementById('standard-only').checked = state.settings.standardOnly;
+        
+        // Load theme settings
+        const themeMode = state.settings.themeMode || 'light';
+        document.getElementById(`theme-${themeMode}`).checked = true;
+        
+        const glowEffect = state.settings.glowEffect || 'none';
+        document.getElementById('glow-color').value = glowEffect;
+    }
+    // Always apply theme (uses defaults if no saved settings)
+    applyTheme();
+}
+
+function applyTheme() {
+    const themeMode = state.settings.themeMode || 'light';
+    const glowEffect = state.settings.glowEffect || 'none';
+    
+    // Remove all theme classes
+    document.body.classList.remove('theme-light', 'theme-dark');
+    document.body.classList.remove('glow-neon-pink', 'glow-cyan-dream', 'glow-purple-storm', 
+                                   'glow-sunset-fire', 'glow-ocean-wave', 'glow-aurora-lights');
+    document.body.classList.remove('has-glow');
+    
+    // Apply theme mode
+    document.body.classList.add(`theme-${themeMode}`);
+    
+    // Apply glow effect
+    if (glowEffect !== 'none') {
+        document.body.classList.add(`glow-${glowEffect}`);
+        document.body.classList.add('has-glow');
     }
 }
 
@@ -897,7 +1350,18 @@ function saveSettings() {
     localStorage.setItem('protoreader-settings', JSON.stringify(state.settings));
 }
 
-// ==================== Statistics ====================
+// ==================== Custom Alert ====================
+function showCustomAlert(message = 'Settings saved!') {
+    const alertBox = document.getElementById('custom-alert');
+    const alertMessage = document.getElementById('custom-alert-message');
+    
+    alertMessage.textContent = message;
+    alertBox.classList.add('show');
+    
+    setTimeout(() => {
+        alertBox.classList.remove('show');
+    }, 2000);
+}
 function loadStatistics() {
     const saved = localStorage.getItem('protoreader-stats');
     if (saved) {
@@ -979,11 +1443,24 @@ function initializeKeyboardControls() {
             e.preventDefault();
             buzz();
         }
+
+        // Space to buzz in multiplayer
+        if (e.code === 'Space' && state.currentScreen === 'multiplayer-game' && !state.multiplayer.buzzed && !state.multiplayer.answered) {
+            e.preventDefault();
+            buzzMultiplayer();
+        }
         
         // Enter to submit answer
         if (e.code === 'Enter' && state.currentScreen === 'tossup-game' && state.buzzed && !state.answered) {
             if (document.activeElement.id === 'answer-input') {
                 submitAnswer();
+            }
+        }
+
+        // Enter to submit answer in multiplayer
+        if (e.code === 'Enter' && state.currentScreen === 'multiplayer-game' && state.multiplayer.buzzed && !state.multiplayer.answered) {
+            if (document.activeElement.id === 'multiplayer-answer-input') {
+                submitMultiplayerAnswer();
             }
         }
         
@@ -1021,7 +1498,8 @@ function initializeKeyboardControls() {
     document.getElementById('end-bonus-btn').addEventListener('click', resetToHome);
     
     // Back button for multiplayer
-    document.getElementById('back-to-home-mp')?.addEventListener('click', resetToHome);
+    document.getElementById('back-to-home-mp-1')?.addEventListener('click', resetToHome);
+    document.getElementById('back-to-home-mp-2')?.addEventListener('click', resetToHome);
 }
 
 // ==================== Database Search ====================
@@ -1031,11 +1509,486 @@ document.getElementById('search-btn')?.addEventListener('click', () => {
 });
 
 // ==================== Multiplayer ====================
-// Placeholder for future implementation
-document.getElementById('create-room-btn')?.addEventListener('click', () => {
-    alert('Multiplayer feature coming soon!');
-});
+function initializeMultiplayer() {
+    // Only initialize Socket.io if it's available and not already connected
+    if (typeof io === 'undefined' || state.multiplayer.socket) {
+        return;
+    }
+    
+    // Connect to Socket.io server
+    state.multiplayer.socket = io();
 
-document.getElementById('join-room-btn')?.addEventListener('click', () => {
-    alert('Multiplayer feature coming soon!');
-});
+    // Handle player name entry
+    document.getElementById('proceed-multiplayer-btn').addEventListener('click', () => {
+        const playerName = document.getElementById('player-name').value.trim();
+        if (!playerName) {
+            alert('Please enter your name');
+            return;
+        }
+        state.multiplayer.playerName = playerName;
+        document.getElementById('lobby-player-name').textContent = playerName;
+        showScreen('multiplayer-lobby');
+        
+        // Request rooms list
+        state.multiplayer.socket.emit('getRooms');
+    });
+
+    // Back buttons
+    document.getElementById('back-to-home-mp-1').addEventListener('click', resetToHome);
+    document.getElementById('back-to-home-mp-2').addEventListener('click', resetToHome);
+
+    // Create room button
+    document.getElementById('create-room-btn').addEventListener('click', () => {
+        state.multiplayer.socket.emit('createRoom', { playerName: state.multiplayer.playerName });
+    });
+
+    // Refresh rooms button
+    document.getElementById('refresh-rooms-btn').addEventListener('click', () => {
+        state.multiplayer.socket.emit('getRooms');
+    });
+
+    // Leave room button
+    document.getElementById('leave-room-btn').addEventListener('click', () => {
+        state.multiplayer.socket.emit('leaveRoom', { roomCode: state.multiplayer.roomCode });
+        resetToHome();
+    });
+
+    // Start game button (host only) - removed, game starts automatically
+    
+    // End game button
+    document.getElementById('end-multiplayer-game-btn').addEventListener('click', () => {
+        state.multiplayer.socket.emit('leaveRoom', { roomCode: state.multiplayer.roomCode });
+        resetToHome();
+    });
+
+    // Multiplayer answer input
+    document.getElementById('multiplayer-submit-answer-btn').addEventListener('click', submitMultiplayerAnswer);
+
+    // Multiplayer strictness slider
+    const multiplayerStrictnessSlider = document.getElementById('multiplayer-strictness-slider');
+    if (multiplayerStrictnessSlider) {
+        multiplayerStrictnessSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            state.settings.strictness = value;
+            document.getElementById('multiplayer-strictness-value').textContent = value;
+        });
+    }
+
+    // Multiplayer sidebar toggle
+    const mpSidebarToggle = document.getElementById('multiplayer-sidebar-toggle');
+    const mpSidebar = document.getElementById('multiplayer-game-sidebar');
+    if (mpSidebarToggle && mpSidebar) {
+        mpSidebarToggle.addEventListener('click', () => {
+            mpSidebar.classList.toggle('collapsed');
+            const icon = mpSidebarToggle.querySelector('.toggle-icon');
+            if (mpSidebar.classList.contains('collapsed')) {
+                icon.textContent = '▶';
+            } else {
+                icon.textContent = '◀';
+            }
+        });
+    }
+
+    // ==================== Socket.io Event Listeners ====================
+    state.multiplayer.socket.on('roomCreated', (data) => {
+        console.log('Room created:', data.roomCode);
+        state.multiplayer.roomCode = data.roomCode;
+        state.multiplayer.isHost = true;
+        document.getElementById('current-room-code').textContent = data.roomCode;
+        document.getElementById('start-multiplayer-btn').style.display = 'none';
+        document.getElementById('waiting-for-host').style.display = 'block';
+        document.getElementById('waiting-for-host').textContent = 'Game starting...';
+        showScreen('multiplayer-room');
+        
+        // Auto-start game immediately
+        startMultiplayerGameAuto();
+    });
+
+    state.multiplayer.socket.on('roomJoined', (data) => {
+        console.log('Room joined:', data.roomCode);
+        state.multiplayer.roomCode = data.roomCode;
+        state.multiplayer.isHost = false;
+        document.getElementById('current-room-code').textContent = data.roomCode;
+        document.getElementById('start-multiplayer-btn').style.display = 'none';
+        document.getElementById('waiting-for-host').style.display = 'block';
+        showScreen('multiplayer-room');
+        updatePlayersList(data.players);
+    });
+
+    state.multiplayer.socket.on('updatePlayers', (players) => {
+        console.log('Players updated:', players);
+        
+        // Detect new players
+        players.forEach(newPlayer => {
+            const wasAlreadyHere = state.multiplayer.players.some(p => p.id === newPlayer.id);
+            if (!wasAlreadyHere) {
+                appendPlayerJoinedLog(newPlayer.name);
+            }
+        });
+        
+        state.multiplayer.players = players;
+        updatePlayersList(players);
+    });
+
+    state.multiplayer.socket.on('error', (message) => {
+        console.error('Socket error:', message);
+        alert('Error: ' + message);
+        resetToHome();
+    });
+
+    state.multiplayer.socket.on('roomsList', (roomsList) => {
+        console.log('Rooms list received:', roomsList);
+        displayRoomsList(roomsList);
+    });
+
+    state.multiplayer.socket.on('gameStarted', (data) => {
+        console.log('Game started');
+        state.multiplayer.currentQuestion = 0;
+        state.multiplayer.questions = data.questions;
+        state.multiplayer.players = data.players;
+        resetMultiplayerQuestionState();
+        showScreen('multiplayer-game');
+        loadMultiplayerQuestion(data.questions);
+    });
+
+    state.multiplayer.socket.on('playerBuzzed', (playerName) => {
+        console.log('Player buzzed:', playerName);
+        document.getElementById('multiplayer-buzz-status').textContent = `${playerName} buzzed in!`;
+        document.getElementById('multiplayer-buzz-status').style.color = 'var(--warning)';
+    });
+
+    state.multiplayer.socket.on('answerResult', (data) => {
+        console.log('Answer result:', data);
+        // Update scores
+        updateMultiplayerScores(data.players);
+        // Show feedback
+        if (data.correct) {
+            document.getElementById('multiplayer-answer-feedback').textContent = `✓ ${data.playerName} is correct!`;
+            document.getElementById('multiplayer-answer-feedback').className = 'answer-feedback correct';
+        } else {
+            document.getElementById('multiplayer-answer-feedback').textContent = `✗ ${data.playerName} is incorrect. Answer: ${data.answer}`;
+            document.getElementById('multiplayer-answer-feedback').className = 'answer-feedback incorrect';
+        }
+    });
+
+    state.multiplayer.socket.on('nextQuestion', () => {
+        console.log('Moving to next question');
+        state.multiplayer.currentQuestion++;
+        resetMultiplayerQuestionState();
+        const questions = state.multiplayer.questions;
+        if (state.multiplayer.currentQuestion < questions.length) {
+            loadMultiplayerQuestion(questions);
+        }
+    });
+
+    state.multiplayer.socket.on('gameEnded', (data) => {
+        console.log('Game ended');
+        alert('Game Over! Final Scores:\n' + 
+              data.players.map(p => `${p.name}: ${p.score}`).join('\n'));
+        resetToHome();
+    });
+}
+
+function updatePlayersList(players) {
+    const list = document.getElementById('players-list');
+    list.innerHTML = '';
+    players.forEach(player => {
+        const playerEl = document.createElement('div');
+        playerEl.style.cssText = 'padding: 0.75rem; background: var(--bg-primary); border-radius: 6px; display: flex; justify-content: space-between; align-items: center;';
+        playerEl.innerHTML = `
+            <span>${player.name}${player.isHost ? ' <strong style="color: var(--primary);">(Host)</strong>' : ''}</span>
+            <span style="color: var(--text-light);">${player.score} pts</span>
+        `;
+        list.appendChild(playerEl);
+    });
+}
+
+function displayRoomsList(roomsList) {
+    const roomsListDiv = document.getElementById('rooms-list');
+    roomsListDiv.innerHTML = '';
+    
+    if (roomsList.length === 0) {
+        const emptyMsg = document.createElement('div');
+        emptyMsg.style.cssText = 'text-align: center; color: var(--text-light); padding: 2rem;';
+        emptyMsg.textContent = 'No active rooms. Create one to get started!';
+        roomsListDiv.appendChild(emptyMsg);
+        return;
+    }
+    
+    roomsList.forEach(room => {
+        const roomEl = document.createElement('div');
+        roomEl.style.cssText = 'padding: 1rem; background: var(--bg-primary); border: 2px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s; display: flex; justify-content: space-between; align-items: center;';
+        roomEl.onmouseover = () => roomEl.style.borderColor = 'var(--primary)';
+        roomEl.onmouseout = () => roomEl.style.borderColor = 'var(--border)';
+        
+        const leftDiv = document.createElement('div');
+        leftDiv.innerHTML = `
+            <div style="font-weight: 600; margin-bottom: 0.25rem;">Room ${room.code}</div>
+            <div style="font-size: 0.9rem; color: var(--text-light);">Host: ${room.hostName}</div>
+            <div style="font-size: 0.9rem; color: var(--text-light);">${room.playerCount} player${room.playerCount !== 1 ? 's' : ''} ${room.gameStarted ? '(In progress)' : '(Waiting)'}</div>
+        `;
+        
+        const joinBtn = document.createElement('button');
+        joinBtn.className = 'start-btn';
+        joinBtn.textContent = 'Join';
+        joinBtn.style.cssText = 'padding: 0.5rem 1rem; font-size: 0.9rem;';
+        joinBtn.onclick = () => {
+            state.multiplayer.socket.emit('joinRoom', { 
+                roomCode: room.code,
+                playerName: state.multiplayer.playerName 
+            });
+        };
+        
+        roomEl.appendChild(leftDiv);
+        roomEl.appendChild(joinBtn);
+        roomsListDiv.appendChild(roomEl);
+    });
+}
+
+function appendPlayerJoinedLog(playerName) {
+    const log = document.getElementById('multiplayer-buzz-log');
+    if (!log) return;
+
+    const empty = log.querySelector('.buzz-log-empty');
+    if (empty) {
+        empty.remove();
+    }
+
+    const item = document.createElement('div');
+    item.className = 'buzz-log-item';
+    item.style.cssText = 'background: var(--bg-secondary); border-left: 3px solid var(--primary);';
+
+    const icon = document.createElement('span');
+    icon.className = 'buzz-log-icon';
+    icon.textContent = '→';
+    icon.style.color = 'var(--primary)';
+
+    const body = document.createElement('div');
+    body.className = 'buzz-log-body';
+
+    const line1 = document.createElement('div');
+    line1.className = 'buzz-log-line';
+    line1.style.color = 'var(--primary)';
+    line1.textContent = `${playerName} joined the room`;
+
+    body.appendChild(line1);
+    item.append(icon, body);
+    log.prepend(item);
+}
+
+async function loadMultiplayerQuestion(questions) {
+    try {
+        const question = questions[state.multiplayer.currentQuestion];
+        state.multiplayer.currentQuestionData = question;
+        
+        const metadataEl = document.getElementById('multiplayer-question-metadata');
+        const textEl = document.getElementById('multiplayer-question-text');
+        
+        if (state.settings.showMetadata) {
+            const difficultyObj = CONFIG.DIFFICULTIES.find(d => d.value === question.difficulty);
+            const difficultyName = difficultyObj ? difficultyObj.display : question.difficulty;
+            metadataEl.textContent = `${question.category} | ${question.subcategory} | ${difficultyName} | ${question.tournament} ${question.year}`;
+            metadataEl.style.display = 'block';
+        } else {
+            metadataEl.style.display = 'none';
+        }
+        
+        textEl.textContent = '';
+        document.getElementById('multiplayer-progress-fill').style.width = '0%';
+        
+        startMultiplayerReading();
+    } catch (error) {
+        console.error('Error loading multiplayer question:', error);
+    }
+}
+
+function startMultiplayerReading() {
+    const question = state.multiplayer.currentQuestionData;
+    const cleanText = stripHtmlTags(question.question);
+    const words = cleanText.split(' ');
+    state.multiplayer.currentQuestionWordCount = words.length;
+    const wordsPerSecond = state.settings.readingSpeed / 60;
+    const intervalMs = 1000 / wordsPerSecond;
+    
+    state.multiplayer.readingPosition = 0;
+    state.multiplayer.readingInterval = setInterval(() => {
+        if (state.multiplayer.buzzed) {
+            stopMultiplayerReading();
+            return;
+        }
+        
+        if (state.multiplayer.readingPosition < words.length) {
+            const textEl = document.getElementById('multiplayer-question-text');
+            textEl.textContent = words.slice(0, state.multiplayer.readingPosition + 1).join(' ');
+            state.multiplayer.readingPosition++;
+            
+            const progress = (state.multiplayer.readingPosition / words.length) * 100;
+            document.getElementById('multiplayer-progress-fill').style.width = `${progress}%`;
+        } else {
+            stopMultiplayerReading();
+            startMultiplayerBuzzWindow();
+        }
+    }, intervalMs);
+}
+
+function stopMultiplayerReading() {
+    if (state.multiplayer.readingInterval) {
+        clearInterval(state.multiplayer.readingInterval);
+        state.multiplayer.readingInterval = null;
+    }
+}
+
+function startMultiplayerBuzzWindow() {
+    state.multiplayer.buzzWindowTime = 5;
+    state.multiplayer.buzzWindowInterval = setInterval(() => {
+        state.multiplayer.buzzWindowTime--;
+        
+        if (state.multiplayer.buzzWindowTime <= 0) {
+            stopMultiplayerBuzzWindow();
+        }
+    }, 1000);
+}
+
+function stopMultiplayerBuzzWindow() {
+    if (state.multiplayer.buzzWindowInterval) {
+        clearInterval(state.multiplayer.buzzWindowInterval);
+        state.multiplayer.buzzWindowInterval = null;
+    }
+}
+
+function buzzMultiplayer() {
+    if (state.multiplayer.buzzed) return;
+    
+    state.multiplayer.buzzed = true;
+    state.multiplayer.buzzPosition = state.multiplayer.readingPosition;
+    stopMultiplayerReading();
+    stopMultiplayerBuzzWindow();
+    
+    document.getElementById('multiplayer-buzz-status').textContent = 'You buzzed! Enter your answer:';
+    document.getElementById('multiplayer-buzz-status').style.color = 'var(--warning)';
+    document.getElementById('multiplayer-buzz-status').style.fontWeight = '700';
+    
+    const answerInput = document.getElementById('multiplayer-answer-input');
+    answerInput.disabled = false;
+    answerInput.placeholder = 'Type your answer...';
+    answerInput.focus();
+    
+    // Emit buzz to server
+    state.multiplayer.socket.emit('buzz', { 
+        roomCode: state.multiplayer.roomCode,
+        playerName: state.multiplayer.playerName 
+    });
+    
+    startMultiplayerTimer();
+}
+
+async function startMultiplayerGameAuto() {
+    try {
+        // Load 10 questions for the multiplayer game
+        const questionsPromises = [];
+        for (let i = 0; i < 10; i++) {
+            questionsPromises.push(fetchTossup());
+        }
+        const questions = await Promise.all(questionsPromises);
+        state.multiplayer.questions = questions;
+        
+        state.multiplayer.socket.emit('startGame', {
+            roomCode: state.multiplayer.roomCode,
+            questions: questions
+        });
+    } catch (error) {
+        console.error('Error loading questions:', error);
+        alert('Failed to load questions. Please try again.');
+    }
+}
+
+function startMultiplayerTimer() {
+    state.multiplayer.timeRemaining = CONFIG.TIMER_DURATION;
+    state.multiplayer.timerInterval = setInterval(() => {
+        state.multiplayer.timeRemaining--;
+        
+        if (state.multiplayer.timeRemaining <= 0) {
+            stopMultiplayerTimer();
+            submitMultiplayerAnswer();
+        }
+    }, 1000);
+}
+
+function stopMultiplayerTimer() {
+    if (state.multiplayer.timerInterval) {
+        clearInterval(state.multiplayer.timerInterval);
+        state.multiplayer.timerInterval = null;
+    }
+}
+
+async function submitMultiplayerAnswer() {
+    if (state.multiplayer.answered) return;
+    
+    const userAnswer = document.getElementById('multiplayer-answer-input').value.trim();
+    state.multiplayer.answered = true;
+    stopMultiplayerTimer();
+    
+    if (!userAnswer) {
+        state.multiplayer.socket.emit('submitAnswer', {
+            roomCode: state.multiplayer.roomCode,
+            playerName: state.multiplayer.playerName,
+            correct: false,
+            correctAnswer: stripHtmlTags(state.multiplayer.currentQuestionData.answer)
+        });
+        return;
+    }
+    
+    try {
+        const result = await checkAnswer(userAnswer);
+        const correct = result.directive?.toLowerCase() === 'accept';
+        
+        state.multiplayer.socket.emit('submitAnswer', {
+            roomCode: state.multiplayer.roomCode,
+            playerName: state.multiplayer.playerName,
+            correct: correct,
+            correctAnswer: stripHtmlTags(state.multiplayer.currentQuestionData.answer)
+        });
+    } catch (error) {
+        console.error('Error checking answer:', error);
+        // Fallback
+        const cleanAnswer = stripHtmlTags(state.multiplayer.currentQuestionData.answer).toLowerCase();
+        const correct = userAnswer.toLowerCase().includes(cleanAnswer.slice(0, 5));
+        
+        state.multiplayer.socket.emit('submitAnswer', {
+            roomCode: state.multiplayer.roomCode,
+            playerName: state.multiplayer.playerName,
+            correct: correct,
+            correctAnswer: stripHtmlTags(state.multiplayer.currentQuestionData.answer)
+        });
+    }
+}
+
+function resetMultiplayerQuestionState() {
+    state.multiplayer.readingPosition = 0;
+    state.multiplayer.currentQuestionWordCount = 0;
+    state.multiplayer.buzzed = false;
+    state.multiplayer.answered = false;
+    state.multiplayer.buzzPosition = 0;
+    state.multiplayer.timeRemaining = CONFIG.TIMER_DURATION;
+    
+    document.getElementById('multiplayer-buzz-status').textContent = '';
+    const answerInput = document.getElementById('multiplayer-answer-input');
+    answerInput.value = '';
+    answerInput.disabled = true;
+    answerInput.placeholder = 'Buzz first to answer...';
+    document.getElementById('multiplayer-answer-feedback').textContent = '';
+    document.getElementById('multiplayer-answer-feedback').className = 'answer-feedback';
+}
+
+function updateMultiplayerScores(players) {
+    const scoresDiv = document.getElementById('multiplayer-scores');
+    scoresDiv.innerHTML = '';
+    
+    players.forEach(player => {
+        const scorePill = document.createElement('div');
+        scorePill.className = 'stat-pill';
+        const label = player.name === state.multiplayer.playerName ? 'Your Score:' : `${player.name}:`;
+        scorePill.innerHTML = `${label} <span>${player.score}</span>`;
+        scoresDiv.appendChild(scorePill);
+    });
+}

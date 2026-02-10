@@ -16,10 +16,50 @@
             <a href="#" data-screen="database">Database</a>
             <a href="#" data-screen="statistics">Statistics</a>
             <a href="#" data-screen="settings">Settings</a>
+            <div id="profile-menu" style="display: none; position: relative;">
+                <button id="profile-btn" style="background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; color: var(--primary); font-weight: 500; padding: 0;">
+                    <div id="profile-avatar" style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; overflow: hidden;">
+                        <span id="profile-initial">U</span>
+                        <img id="profile-img" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                    </div>
+                    <span id="profile-username">User</span>
+                </button>
+                <div id="profile-dropdown" style="position: absolute; top: 100%; right: 0; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; min-width: 200px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: none; z-index: 100; margin-top: 0.5rem;">
+                    <a href="#" id="account-settings-link" data-screen="account-settings" style="display: block; padding: 0.75rem 1rem; color: var(--text); text-decoration: none; border-bottom: 1px solid var(--border); transition: background 0.2s;" onmouseover="this.style.background='var(--bg-primary)'" onmouseout="this.style.background='transparent'">Account Settings</a>
+                    <button id="logout-nav-btn" style="width: 100%; text-align: left; padding: 0.75rem 1rem; background: none; border: none; cursor: pointer; color: var(--danger); transition: background 0.2s;" onmouseover="this.style.background='var(--bg-primary)'" onmouseout="this.style.background='transparent'">Logout</button>
+                </div>
+            </div>
+            <a href="#" id="login-link" data-screen="login">Login</a>
         </div>
     </nav>
 
     <div class="container">
+        <!-- Login/Signup Screen -->
+        <div id="login" class="screen active">
+            <div style="max-width: 400px; margin: 0 auto; padding: 4rem 2rem;">
+                <h1 style="text-align: center; margin-bottom: 2rem;">ProtoReader</h1>
+                
+                <div style="background: var(--bg-secondary); padding: 2rem; border-radius: 12px;">
+                    <div style="display: grid; gap: 1rem; margin-bottom: 2rem;">
+                        <div>
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Username</label>
+                            <input type="text" id="auth-username" placeholder="Enter username..." style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; box-sizing: border-box;">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Password</label>
+                            <input type="password" id="auth-password" placeholder="Enter password..." style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; box-sizing: border-box;">
+                        </div>
+                    </div>
+
+                    <div style="display: grid; gap: 1rem; margin-bottom: 1.5rem;">
+                        <button class="start-btn" id="login-btn" style="width: 100%; padding: 0.75rem;">Login</button>
+                        <button class="start-btn" id="signup-btn" style="width: 100%; padding: 0.75rem; background: var(--text-light);">Create Account</button>
+                    </div>
+
+                    <div id="auth-error" style="text-align: center; color: var(--danger); font-size: 0.9rem; display: none; padding: 0.75rem; background: rgba(239, 68, 68, 0.1); border-radius: 6px;"></div>
+                </div>
+            </div>
+        </div>
         <!-- Home Screen -->
         <div id="home" class="screen active">
             <h1>ProtoReader</h1>
@@ -40,7 +80,7 @@
                 <div class="mode-card" id="multiplayer-mode-card">
                     <div class="mode-icon">MP</div>
                     <h3>Multiplayer</h3>
-                    <p>Compete with friends in real-time (Coming Soon)</p>
+                    <p>Compete with friends in real-time</p>
                 </div>
             </div>
         </div>
@@ -154,6 +194,13 @@
                                 <div style="display: flex; gap: 0.5rem; align-items: center;">
                                     <input type="range" id="game-speed" min="50" max="500" value="250" step="10" style="flex: 1;">
                                     <span id="game-speed-value" style="font-weight: 600; color: var(--primary); min-width: 60px;">250 WPM</span>
+                                </div>
+                            </div>
+                            <div class="header-section">
+                                <h3 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-light);">Strictness</h3>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <input type="range" id="strictness-slider" min="0" max="2" value="1" step="1" style="flex: 1;">
+                                    <span id="strictness-value" style="font-weight: 600; color: var(--primary); min-width: 60px; font-size: 0.85rem;">1</span>
                                 </div>
                             </div>
                             <div class="header-section">
@@ -331,25 +378,224 @@
                     </label>
                 </div>
                 <div class="setting-item">
+                    <label>Theme Mode</label>
+                    <div style="display: flex; gap: 1rem; margin-top: 0.75rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="radio" name="theme-mode" id="theme-light" value="light" checked style="cursor: pointer;">
+                            Light
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="radio" name="theme-mode" id="theme-dark" value="dark" style="cursor: pointer;">
+                            Dark
+                        </label>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <label for="glow-color">Glow Effect</label>
+                    <select id="glow-color" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem;">
+                        <option value="none">None</option>
+                        <option value="neon-pink">🌸 Neon Pink</option>
+                        <option value="cyan-dream">💎 Cyan Dream</option>
+                        <option value="purple-storm">⚡ Purple Storm</option>
+                        <option value="sunset-fire">🔥 Sunset Fire</option>
+                        <option value="ocean-wave">🌊 Ocean Wave</option>
+                        <option value="aurora-lights">✨ Aurora Lights</option>
+                    </select>
+                </div>
+                <div class="setting-item">
                     <button class="start-btn" id="save-settings-btn">Save Settings</button>
                 </div>
             </div>
         </div>
 
-        <!-- Multiplayer Screen (Placeholder) -->
+        <!-- Account Settings Screen -->
+        <div id="account-settings" class="screen">
+            <h2>Account Settings</h2>
+            <div class="setup-panel">
+                <div style="max-width: 500px; margin: 0 auto; padding: 2rem;">
+                    <div style="text-align: center; margin-bottom: 2rem;">
+                        <div id="account-avatar-display" style="width: 100px; height: 100px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 2rem; margin: 0 auto 1rem; overflow: hidden; cursor: pointer; position: relative; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">
+                            <span id="account-avatar-initial">U</span>
+                            <img id="account-avatar-img" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                        </div>
+                        <input type="file" id="profile-pic-input" accept="image/*" style="display: none;">
+                        <p style="color: var(--text-light); font-size: 0.9rem; margin-top: 0;">Click avatar to change profile picture</p>
+                    </div>
+
+                    <div style="display: grid; gap: 1.5rem;">
+                        <div>
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Current Username</label>
+                            <input type="text" id="account-current-username" readonly style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-secondary); color: var(--text-light);">
+                        </div>
+
+                        <div>
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">New Username (Optional)</label>
+                            <input type="text" id="account-new-username" placeholder="Leave blank to keep current..." style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; box-sizing: border-box;">
+                        </div>
+
+                        <div>
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">New Password (Optional)</label>
+                            <input type="password" id="account-new-password" placeholder="Leave blank to keep current..." style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; box-sizing: border-box;">
+                        </div>
+                    </div>
+
+                    <div id="account-error" style="color: var(--danger); text-align: center; margin: 1rem 0; padding: 0.75rem; background: rgba(239, 68, 68, 0.1); border-radius: 6px; display: none;"></div>
+                    <div id="account-success" style="color: var(--primary); text-align: center; margin: 1rem 0; padding: 0.75rem; background: rgba(59, 130, 246, 0.1); border-radius: 6px; display: none;"></div>
+
+                    <div style="display: grid; gap: 0.75rem; margin-top: 2rem;">
+                        <button class="start-btn" id="save-account-btn" style="width: 100%; padding: 0.75rem;">Save Changes</button>
+                        <button class="back-btn" id="back-from-account" style="width: 100%; padding: 0.75rem;">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Multiplayer - Player Name Entry -->
         <div id="multiplayer-setup" class="screen">
             <h2>Multiplayer Mode</h2>
             <div class="setup-panel">
-                <p style="text-align:center; color:var(--text-light); padding:2rem;">
-                    Multiplayer mode coming soon! You'll be able to create rooms, invite friends, and compete in real-time quiz bowl matches.
-                </p>
+                <div style="max-width: 400px; margin: 0 auto; padding: 2rem;">
+                    <div class="setting-item">
+                        <label for="player-name">Enter Your Name:</label>
+                        <input type="text" id="player-name" placeholder="Your name..." style="width: 100%; padding: 0.75rem; margin-top: 0.5rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem;">
+                    </div>
+                </div>
+            </div>
+            <div class="button-group" style="display: flex; gap: 1rem; justify-content: center;">
+                <button class="start-btn" id="proceed-multiplayer-btn" style="padding: 0.75rem 2rem;">Proceed</button>
+                <button class="back-btn" id="back-to-home-mp-1">Back</button>
+            </div>
+        </div>
+
+        <!-- Multiplayer - Room Selection -->
+        <div id="multiplayer-lobby" class="screen">
+            <h2>Multiplayer - Join or Create Room</h2>
+            <div class="setup-panel">
+                <div style="max-width: 600px; margin: 0 auto; padding: 2rem;">
+                    <div style="text-align: center; margin-bottom: 2rem;">
+                        <p style="font-size: 1.1rem; color: var(--text-light);">Welcome, <strong id="lobby-player-name" style="color: var(--primary);">Player</strong></p>
+                    </div>
+                    
+                    <div style="margin-bottom: 2rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h3 style="margin: 0;">Active Rooms</h3>
+                            <button id="refresh-rooms-btn" style="background: var(--primary); color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">Refresh</button>
+                        </div>
+                        <div id="rooms-list" style="display: grid; gap: 0.75rem; max-height: 300px; overflow-y: auto; margin-bottom: 1.5rem;">
+                            <div style="text-align: center; color: var(--text-light); padding: 2rem;">Loading rooms...</div>
+                        </div>
+                    </div>
+
+                    <div style="text-align: center; margin: 1.5rem 0; color: var(--text-light);">OR</div>
+                    
+                    <button class="start-btn" id="create-room-btn" style="width: 100%; padding: 0.75rem; font-size: 1rem;">Create New Room</button>
+                </div>
             </div>
             <div class="button-group">
-                <button class="back-btn" id="back-to-home-mp">Back to Home</button>
+                <button class="back-btn" id="back-to-home-mp-2">Back</button>
+            </div>
+        </div>
+
+        <!-- Multiplayer - Room Waiting Area -->
+        <div id="multiplayer-room" class="screen">
+            <div class="setup-panel">
+                <div style="max-width: 600px; margin: 0 auto; padding: 2rem;">
+                    <div style="text-align: center; margin-bottom: 2rem;">
+                        <h2 style="margin: 0 0 0.5rem 0;">Room: <span id="current-room-code" style="color: var(--primary); font-family: monospace; font-size: 1.3rem;">LOADING</span></h2>
+                        <p style="color: var(--text-light); font-size: 0.9rem;">Share this code with friends to join</p>
+                    </div>
+
+                    <div style="background: var(--bg-secondary); padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
+                        <h3 style="margin-top: 0; margin-bottom: 1rem;">Players in Room:</h3>
+                        <div id="players-list" style="display: grid; gap: 0.75rem;">
+                            <div style="padding: 0.75rem; background: var(--bg-primary); border-radius: 6px; color: var(--text-light);">No players yet...</div>
+                        </div>
+                    </div>
+
+                    <div id="room-controls" style="text-align: center;">
+                        <button class="start-btn" id="start-multiplayer-btn" style="display: none; padding: 1rem 2rem;">Start Game</button>
+                        <p id="waiting-for-host" style="color: var(--text-light); display: none; margin: 0;">Waiting for host to start game...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="button-group">
+                <button class="back-btn" id="leave-room-btn">Leave Room</button>
+            </div>
+        </div>
+
+        <!-- Multiplayer - Game Screen -->
+        <div id="multiplayer-game" class="screen">
+            <div class="game-container">
+                <div class="game-main">
+                    <div class="question-display">
+                        <div id="multiplayer-question-metadata" class="question-metadata"></div>
+                        <div id="multiplayer-question-text" class="question-text">Loading question...</div>
+                        <div class="progress-bar">
+                            <div id="multiplayer-progress-fill" class="progress-fill"></div>
+                        </div>
+                    </div>
+
+                    <div class="buzz-log-panel">
+                        <h3>Buzz Log</h3>
+                        <div id="multiplayer-buzz-log" class="buzz-log">
+                            <div class="buzz-log-empty">No buzzes yet.</div>
+                        </div>
+                    </div>
+
+                    <div class="answer-section">
+                        <input type="text" id="multiplayer-answer-input" placeholder="Buzz first to answer..." disabled>
+                        <button id="multiplayer-submit-answer-btn">Submit (Enter)</button>
+                        <div id="multiplayer-answer-feedback" class="answer-feedback"></div>
+                    </div>
+                </div>
+
+                <div class="game-sidebar" id="multiplayer-game-sidebar">
+                    <button class="sidebar-toggle" id="multiplayer-sidebar-toggle" title="Toggle sidebar">
+                        <span class="toggle-icon">◀</span>
+                    </button>
+
+                    <div class="sidebar-content">
+                        <div class="game-header">
+                            <div class="header-section">
+                                <h3 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-light);">Current Scores</h3>
+                                <div id="multiplayer-scores" style="display: grid; gap: 0.5rem;">
+                                    <div class="stat-pill">Your Score: <span id="your-score">0</span></div>
+                                </div>
+                            </div>
+                            <div class="header-section">
+                                <h3 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-light);">Strictness</h3>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <input type="range" id="multiplayer-strictness-slider" min="0" max="2" value="1" step="1" style="flex: 1;">
+                                    <span id="multiplayer-strictness-value" style="font-weight: 600; color: var(--primary); min-width: 60px; font-size: 0.85rem;">1</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="buzz-section">
+                            <div style="text-align: center; font-size: 1rem; color: var(--text-light); margin: 1rem 0;">
+                                Press <strong style="color: var(--primary);">SPACE</strong> to buzz in
+                            </div>
+                            <div id="multiplayer-buzz-status" class="buzz-status"></div>
+                        </div>
+
+                        <div class="controls">
+                            <button id="end-multiplayer-game-btn">End Game</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- Custom Alert Box -->
+    <div id="custom-alert" class="custom-alert">
+        <div class="custom-alert-content">
+            <div class="custom-alert-icon">✓</div>
+            <div id="custom-alert-message">Settings saved!</div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
