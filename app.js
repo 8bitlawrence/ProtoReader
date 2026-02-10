@@ -72,7 +72,8 @@ const state = {
         standardOnly: false,
         themeMode: 'light',
         glowEffect: 'none',
-        strictness: 1  // 0=lenient, 1=normal, 2=strict
+        strictness: 1,  // 0=lenient, 1=normal, 2=strict
+        fontSize: 16  // Font size in pixels
     },
     stats: {
         tossups: { correct: 0, incorrect: 0, played: 0, score: 0, powers: 0, normals: 0, negs: 0, dead: 0 },
@@ -1254,6 +1255,17 @@ function initializeSettings() {
         });
     }
     
+    // Font size slider
+    const fontSizeSlider = document.getElementById('font-size');
+    if (fontSizeSlider) {
+        fontSizeSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            state.settings.fontSize = value;
+            document.getElementById('font-size-value').textContent = `${value}px`;
+            applyFontSize();
+        });
+    }
+    
     document.getElementById('auto-reveal').addEventListener('change', (e) => {
         state.settings.autoReveal = e.target.checked;
     });
@@ -1327,6 +1339,15 @@ function loadSettings() {
         document.getElementById('show-metadata').checked = state.settings.showMetadata;
         document.getElementById('standard-only').checked = state.settings.standardOnly;
         
+        // Load font size
+        const fontSize = state.settings.fontSize || 16;
+        const fontSizeSlider = document.getElementById('font-size');
+        const fontSizeValue = document.getElementById('font-size-value');
+        if (fontSizeSlider && fontSizeValue) {
+            fontSizeSlider.value = fontSize;
+            fontSizeValue.textContent = `${fontSize}px`;
+        }
+        
         // Load theme settings
         const themeMode = state.settings.themeMode || 'light';
         document.getElementById(`theme-${themeMode}`).checked = true;
@@ -1334,8 +1355,9 @@ function loadSettings() {
         const glowEffect = state.settings.glowEffect || 'none';
         document.getElementById('glow-color').value = glowEffect;
     }
-    // Always apply theme (uses defaults if no saved settings)
+    // Always apply theme and font size (uses defaults if no saved settings)
     applyTheme();
+    applyFontSize();
 }
 
 function applyTheme() {
@@ -1356,6 +1378,11 @@ function applyTheme() {
         document.body.classList.add(`glow-${glowEffect}`);
         document.body.classList.add('has-glow');
     }
+}
+
+function applyFontSize() {
+    const fontSize = state.settings.fontSize || 16;
+    document.documentElement.style.setProperty('--base-font-size', `${fontSize}px`);
 }
 
 function saveSettings() {
