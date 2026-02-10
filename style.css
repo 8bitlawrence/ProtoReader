@@ -479,6 +479,7 @@ button {
     background: var(--light);
     border-radius: 2px;
     overflow: hidden;
+    display: none;
 }
 
 .progress-fill {
