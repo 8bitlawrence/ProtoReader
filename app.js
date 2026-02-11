@@ -103,7 +103,8 @@ const state = {
     auth: {
         isLoggedIn: false,
         currentUser: null,
-        profilePicture: null
+        profilePicture: null,
+        isVIP: false
     }
 };
 
@@ -246,7 +247,8 @@ function saveAuthState() {
     localStorage.setItem('protoreader-auth', JSON.stringify({
         isLoggedIn: state.auth.isLoggedIn,
         currentUser: state.auth.currentUser,
-        profilePicture: state.auth.profilePicture
+        profilePicture: state.auth.profilePicture,
+        isVIP: state.auth.isVIP
     }));
 }
 
@@ -257,6 +259,7 @@ function loadAuthState() {
         state.auth.isLoggedIn = auth.isLoggedIn;
         state.auth.currentUser = auth.currentUser;
         state.auth.profilePicture = auth.profilePicture;
+        state.auth.isVIP = auth.isVIP || false;
     }
 }
 
@@ -287,7 +290,11 @@ function updateNavbarForLoggedIn() {
         loginLink.style.display = 'none';
         profileMenu.style.display = 'block';
         
-        profileUsername.textContent = state.auth.currentUser;
+        if (state.auth.isVIP) {
+            profileUsername.innerHTML = `${state.auth.currentUser} <span style="color: #fbbf24; margin-left: 0.25rem; font-weight: 700; font-size: 1.2em; text-shadow: 0 0 8px #fbbf24; filter: drop-shadow(0 0 3px #fbbf24);">+</span>`;
+        } else {
+            profileUsername.textContent = state.auth.currentUser;
+        }
         profileInitial.textContent = state.auth.currentUser[0].toUpperCase();
         
         if (state.auth.profilePicture) {
@@ -431,6 +438,69 @@ function initializeAccountSettings() {
         setTimeout(() => {
             successDiv.style.display = 'none';
         }, 3000);
+    });
+    
+    // VIP Code Claim Section
+    const vipSection = document.getElementById('vip-section');
+    const vipStatus = document.getElementById('vip-status');
+    const vipCodeInput = document.getElementById('vip-code-input-field');
+    const claimVipBtn = document.getElementById('claim-vip-btn');
+    const vipError = document.getElementById('vip-error');
+    
+    // Display VIP status
+    if (state.auth.isVIP) {
+        vipSection.style.display = 'block';
+        vipStatus.innerHTML = '<span style="color: #fbbf24; font-weight: 600;"><span style="font-size: 1.2em; text-shadow: 0 0 8px #fbbf24; filter: drop-shadow(0 0 3px #fbbf24);">+</span> ProtoReader+ Member <span style="font-size: 1.2em; text-shadow: 0 0 8px #fbbf24; filter: drop-shadow(0 0 3px #fbbf24);">+</span></span>';
+        document.getElementById('vip-code-input').style.display = 'none';
+        claimVipBtn.style.display = 'none';
+    } else {
+        vipSection.style.display = 'block';
+        vipStatus.innerHTML = '<span style="color: var(--text-light);">You are not a ProtoReader+ member yet.</span>';
+        document.getElementById('vip-code-input').style.display = 'block';
+        claimVipBtn.style.display = 'block';
+    }
+    
+    claimVipBtn.addEventListener('click', async () => {
+        const code = vipCodeInput.value.trim();
+        if (!code) {
+            vipError.textContent = 'Please enter a VIP code';
+            vipError.style.display = 'block';
+            return;
+        }
+        
+        // Validate code with server
+        try {
+            const response = await fetch('/api/validate-vip-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: code, username: state.auth.currentUser })
+            });
+            
+            if (response.ok) {
+                state.auth.isVIP = true;
+                saveAuthState();
+                document.getElementById('vip-code-input').style.display = 'none';
+                claimVipBtn.style.display = 'none';
+                vipStatus.innerHTML = '<span style="color: #fbbf24; font-weight: 600;"><span style="font-size: 1.2em; text-shadow: 0 0 8px #fbbf24; filter: drop-shadow(0 0 3px #fbbf24);">+</span> ProtoReader+ Member <span style="font-size: 1.2em; text-shadow: 0 0 8px #fbbf24; filter: drop-shadow(0 0 3px #fbbf24);">+</span></span>';
+                vipError.textContent = 'Welcome to ProtoReader+!';
+                vipError.style.color = '#10b981';
+                vipError.style.display = 'block';
+                updateNavbar();
+                loadSettings();
+                setTimeout(() => {
+                    vipError.style.display = 'none';
+                }, 3000);
+            } else {
+                const error = await response.json();
+                vipError.textContent = error.message || 'Invalid VIP code';
+                vipError.style.color = '#ef4444';
+                vipError.style.display = 'block';
+            }
+        } catch (error) {
+            vipError.textContent = 'Error validating code. Please try again.';
+            vipError.style.color = '#ef4444';
+            vipError.style.display = 'block';
+        }
     });
     
     // Back button
@@ -1204,22 +1274,30 @@ async function submitBonusPart(partIndex) {
         if (!response.ok) throw new Error('API error');
         
         const result = await response.json();
-        const correct = result.directive.toLowerCase() === 'accept';
+        const directive = result.directive.toLowerCase();
         
-        if (correct) {
+        if (directive === 'accept') {
             feedbackEl.textContent = `✓ Correct! Answer: ${correctAnswer}`;
             feedbackEl.style.color = '#10b981';
             state.stats.bonuses.points += 10;
             state.stats.bonuses.partsCorrect++;
+            state.stats.bonuses.partsPlayed++;
+            saveStatistics();
+            updateBonusStats();
+            nextBonusPart(partIndex);
+        } else if (directive === 'prompt') {
+            feedbackEl.innerHTML = `<span style="background: #fbbf24; color: #000; padding: 0.25rem 0.75rem; border-radius: 4px; font-weight: 600; display: inline-block;">PROMPT</span>`;
+            answerInput.focus();
+            answerInput.select();
+            return;
         } else {
             feedbackEl.textContent = `✗ Incorrect. Answer: ${correctAnswer}`;
             feedbackEl.style.color = '#ef4444';
+            state.stats.bonuses.partsPlayed++;
+            saveStatistics();
+            updateBonusStats();
+            nextBonusPart(partIndex);
         }
-        
-        state.stats.bonuses.partsPlayed++;
-        saveStatistics();
-        updateBonusStats();
-        nextBonusPart(partIndex);
     } catch (error) {
         console.error('Error checking bonus answer:', error);
         feedbackEl.textContent = `Answer: ${correctAnswer}`;
@@ -1335,7 +1413,16 @@ function initializeSettings() {
     
     // Glow effect listener
     document.getElementById('glow-color').addEventListener('change', (e) => {
-        state.settings.glowEffect = e.target.value;
+        const selectedTheme = e.target.value;
+        const vipThemes = ['pulse-gold-purple', 'pulse-cyan-pink'];
+        
+        if (vipThemes.includes(selectedTheme) && !state.auth.isVIP) {
+            alert('This theme is available for ProtoReader+ members only. Claim your VIP code in Account Settings!');
+            document.getElementById('glow-color').value = state.settings.glowEffect;
+            return;
+        }
+        
+        state.settings.glowEffect = selectedTheme;
         applyTheme();
         saveSettings();
     });
@@ -1542,14 +1629,10 @@ function initializeKeyboardControls() {
             }
         }
         
-        // N for next question
-        if (e.code === 'KeyN' && (state.currentScreen === 'tossup-game' || state.currentScreen === 'bonus-game')) {
-            if (state.answered || state.currentScreen === 'bonus-game') {
-                if (state.currentScreen === 'tossup-game') {
-                    loadNextTossup();
-                } else {
-                    loadNextBonus();
-                }
+        // N for next question (tossup only)
+        if (e.code === 'KeyN' && state.currentScreen === 'tossup-game') {
+            if (state.answered) {
+                loadNextTossup();
             }
         }
     });
@@ -1622,7 +1705,7 @@ function initializeMultiplayer() {
 
     // Create room button
     document.getElementById('create-room-btn').addEventListener('click', () => {
-        state.multiplayer.socket.emit('createRoom', { playerName: state.multiplayer.playerName });
+        state.multiplayer.socket.emit('createRoom', { playerName: state.multiplayer.playerName, isVIP: state.auth.isVIP });
     });
 
     // Refresh rooms button
@@ -1787,8 +1870,15 @@ function updatePlayersList(players) {
     players.forEach(player => {
         const playerEl = document.createElement('div');
         playerEl.style.cssText = 'padding: 0.75rem; background: var(--bg-primary); border-radius: 6px; display: flex; justify-content: space-between; align-items: center;';
+        
+        // Check if player is VIP
+        const isVIP = player.isVIP || false;
+        const nameStyle = isVIP ? 'background: linear-gradient(90deg, #fbbf24, #f59e0b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 600;' : '';
+        const plusIcon = isVIP ? ' <span style="color: #fbbf24; margin-left: 0.25rem; font-weight: 700; font-size: 1.1em; text-shadow: 0 0 8px #fbbf24; filter: drop-shadow(0 0 3px #fbbf24);">+</span>' : '';
+        const hostBadge = player.isHost ? ' <strong style="color: var(--primary);">(Host)</strong>' : '';
+        
         playerEl.innerHTML = `
-            <span>${player.name}${player.isHost ? ' <strong style="color: var(--primary);">(Host)</strong>' : ''}</span>
+            <span style="${nameStyle}">${player.name}${plusIcon}${hostBadge}</span>
             <span style="color: var(--text-light);">${player.score} pts</span>
         `;
         list.appendChild(playerEl);
@@ -1827,7 +1917,8 @@ function displayRoomsList(roomsList) {
         joinBtn.onclick = () => {
             state.multiplayer.socket.emit('joinRoom', { 
                 roomCode: room.code,
-                playerName: state.multiplayer.playerName 
+                playerName: state.multiplayer.playerName,
+                isVIP: state.auth.isVIP
             });
         };
         
@@ -2056,6 +2147,11 @@ async function submitMultiplayerAnswer() {
 }
 
 function resetMultiplayerQuestionState() {
+    // Clear any running intervals
+    stopMultiplayerReading();
+    stopMultiplayerBuzzWindow();
+    stopMultiplayerTimer();
+    
     state.multiplayer.readingPosition = 0;
     state.multiplayer.currentQuestionWordCount = 0;
     state.multiplayer.buzzed = false;

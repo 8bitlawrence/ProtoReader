@@ -401,6 +401,8 @@
                         <option value="sunset-fire">🔥 Sunset Fire</option>
                         <option value="ocean-wave">🌊 Ocean Wave</option>
                         <option value="aurora-lights">✨ Aurora Lights</option>
+                        <option value="pulse-gold-purple">⭐ Gold & Purple Pulse (ProtoReader+)</option>
+                        <option value="pulse-cyan-pink">💫 Cyan & Pink Pulse (ProtoReader+)</option>
                     </select>
                 </div>
                 <div class="setting-item">
@@ -449,6 +451,19 @@
 
                     <div id="account-error" style="color: var(--danger); text-align: center; margin: 1rem 0; padding: 0.75rem; background: rgba(239, 68, 68, 0.1); border-radius: 6px; display: none;"></div>
                     <div id="account-success" style="color: var(--primary); text-align: center; margin: 1rem 0; padding: 0.75rem; background: rgba(59, 130, 246, 0.1); border-radius: 6px; display: none;"></div>
+                    
+                    <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border);">
+                    
+                    <div id="vip-section" style="background: var(--bg-secondary); padding: 1.5rem; border-radius: 8px; border: 2px solid #fbbf24; display: none;">
+                        <h3 style="margin-top: 0; color: #fbbf24;">ProtoReader+</h3>
+                        <p id="vip-status" style="color: var(--text-light); margin: 0 0 1rem 0;"></p>
+                        <div id="vip-code-input" style="display: none; margin-bottom: 1rem;">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Enter VIP Code</label>
+                            <input type="text" id="vip-code-input-field" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; box-sizing: border-box; margin-bottom: 0.75rem;" placeholder="Enter your VIP code...">
+                        </div>
+                        <button class="start-btn" id="claim-vip-btn" style="width: 100%; padding: 0.75rem; display: none; margin-top: 1rem;">Claim ProtoReader+</button>
+                        <div id="vip-error" style="color: var(--danger); text-align: center; margin: 1rem 0; padding: 0.75rem; background: rgba(239, 68, 68, 0.1); border-radius: 6px; display: none; font-size: 0.9rem;"></div>
+                    </div>
 
                     <div style="display: grid; gap: 0.75rem; margin-top: 2rem;">
                         <button class="start-btn" id="save-account-btn" style="width: 100%; padding: 0.75rem;">Save Changes</button>

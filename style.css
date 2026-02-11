@@ -63,6 +63,67 @@ body.glow-aurora-lights {
     --glow-color-light: rgba(139, 92, 246, 0.3);
 }
 
+/* VIP Pulsing Themes */
+body.glow-pulse-gold-purple {
+    --glow-color: #fbbf24;
+    --glow-color-light: rgba(251, 191, 36, 0.3);
+    --glow-color-secondary: #a855f7;
+    --glow-color-secondary-light: rgba(168, 85, 247, 0.3);
+}
+
+body.glow-pulse-gold-purple::before {
+    background: 
+        radial-gradient(circle at 20% 30%, var(--glow-color-light) 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(168, 85, 247, 0.3) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, var(--glow-color-light) 0%, transparent 50%);
+    animation: pulseGoldPurple 6s ease-in-out infinite;
+}
+
+@keyframes pulseGoldPurple {
+    0% {
+        opacity: 0.6;
+        filter: hue-rotate(0deg);
+    }
+    50% {
+        opacity: 1;
+        filter: hue-rotate(60deg);
+    }
+    100% {
+        opacity: 0.6;
+        filter: hue-rotate(0deg);
+    }
+}
+
+body.glow-pulse-cyan-pink {
+    --glow-color: #06b6d4;
+    --glow-color-light: rgba(6, 182, 212, 0.3);
+    --glow-color-secondary: #ec4899;
+    --glow-color-secondary-light: rgba(236, 72, 153, 0.3);
+}
+
+body.glow-pulse-cyan-pink::before {
+    background: 
+        radial-gradient(circle at 20% 30%, var(--glow-color-light) 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(236, 72, 153, 0.3) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, var(--glow-color-light) 0%, transparent 50%);
+    animation: pulseCyanPink 6s ease-in-out infinite;
+}
+
+@keyframes pulseCyanPink {
+    0% {
+        opacity: 0.6;
+        filter: hue-rotate(0deg);
+    }
+    50% {
+        opacity: 1;
+        filter: hue-rotate(180deg);
+    }
+    100% {
+        opacity: 0.6;
+        filter: hue-rotate(0deg);
+    }
+}
+
 * {
     margin: 0;
     padding: 0;

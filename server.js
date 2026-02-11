@@ -9,11 +9,69 @@ const io = require('socket.io')(http, {
 });
 const path = require('path');
 
-// Serve static files
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname)));
+
+// VIP Codes storage
+// Option 1: Hardcoded list (for testing)
+const VIP_CODES = [
+    'PROTO2024',
+    'READER2024',
+    'PLUS2024'
+];
+
+// Option 2: Load from environment variables (more secure)
+// Format: VIP_CODES_LIST=CODE1,CODE2,CODE3
+const envCodes = process.env.VIP_CODES_LIST ? process.env.VIP_CODES_LIST.split(',') : [];
+const VALID_VIP_CODES = [...VIP_CODES, ...envCodes];
+
+// Track used codes to prevent reuse (optional)
+const usedCodes = new Set();
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// VIP Code Validation Endpoint
+app.post('/api/validate-vip-code', (req, res) => {
+    const { code, username } = req.body;
+    
+    if (!code || !username) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Code and username are required' 
+        });
+    }
+    
+    const trimmedCode = code.trim().toUpperCase();
+    
+    // Check if code is valid
+    if (!VALID_VIP_CODES.includes(trimmedCode)) {
+        return res.status(401).json({ 
+            success: false, 
+            message: 'Invalid VIP code' 
+        });
+    }
+    
+    // Optional: Prevent code reuse
+    if (usedCodes.has(trimmedCode)) {
+        return res.status(401).json({ 
+            success: false, 
+            message: 'This code has already been used' 
+        });
+    }
+    
+    // Mark code as used
+    usedCodes.add(trimmedCode);
+    
+    console.log(`VIP code claimed by ${username}: ${trimmedCode}`);
+    
+    return res.status(200).json({ 
+        success: true, 
+        message: 'VIP code validated successfully' 
+    });
 });
 
 // Game state management
@@ -45,7 +103,8 @@ io.on('connection', (socket) => {
                 id: socket.id,
                 name: data.playerName,
                 score: 0,
-                isHost: true
+                isHost: true,
+                isVIP: data.isVIP || false
             }],
             gameStarted: false,
             currentQuestion: 0,
@@ -92,7 +151,8 @@ io.on('connection', (socket) => {
             id: socket.id,
             name: data.playerName,
             score: 0,
-            isHost: false
+            isHost: false,
+            isVIP: data.isVIP || false
         };
 
         room.players.push(player);
