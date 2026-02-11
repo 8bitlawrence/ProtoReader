@@ -77,6 +77,14 @@ io.on('connection', (socket) => {
                 roomCode: data.roomCode,
                 players: room.players
             });
+            // If game is already started, send game state
+            if (room.gameStarted) {
+                socket.emit('gameStarted', {
+                    questions: room.questions,
+                    players: room.players,
+                    currentQuestion: room.currentQuestion
+                });
+            }
             return;
         }
 
@@ -97,6 +105,14 @@ io.on('connection', (socket) => {
         });
 
         io.to(data.roomCode).emit('updatePlayers', room.players);
+        // If game is already started, send game state to the new player
+        if (room.gameStarted) {
+            socket.emit('gameStarted', {
+                questions: room.questions,
+                players: room.players,
+                currentQuestion: room.currentQuestion
+            });
+        }
         console.log(`${data.playerName} joined room ${data.roomCode}`);
     });
 

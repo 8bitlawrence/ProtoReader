@@ -1267,6 +1267,11 @@ function initializeSettings() {
     const gameSpeedSlider = document.getElementById('game-speed');
     if (gameSpeedSlider) {
         gameSpeedSlider.addEventListener('input', (e) => {
+            // Prevent speed changes during active reading/answering
+            if (state.buzzed || state.readingInterval) {
+                gameSpeedSlider.value = state.settings.readingSpeed;
+                return;
+            }
             state.settings.readingSpeed = parseInt(e.target.value);
             document.getElementById('game-speed-value').textContent = `${e.target.value} WPM`;
         });
@@ -1276,6 +1281,11 @@ function initializeSettings() {
     const strictnessSlider = document.getElementById('strictness-slider');
     if (strictnessSlider) {
         strictnessSlider.addEventListener('input', (e) => {
+            // Prevent strictness changes during active answering
+            if (state.buzzed) {
+                strictnessSlider.value = state.settings.strictness;
+                return;
+            }
             const value = parseInt(e.target.value);
             state.settings.strictness = value;
             const strictnessLabels = ['Lenient', 'Normal', 'Strict'];
@@ -1578,9 +1588,14 @@ document.getElementById('search-btn')?.addEventListener('click', () => {
 
 // ==================== Multiplayer ====================
 function initializeMultiplayer() {
-    // Only initialize Socket.io if it's available and not already connected
-    if (typeof io === 'undefined' || state.multiplayer.socket) {
+    // Only initialize Socket.io if it's available
+    if (typeof io === 'undefined') {
         return;
+    }
+    
+    // If already connected, remove old listeners and reconnect
+    if (state.multiplayer.socket) {
+        state.multiplayer.socket.disconnect();
     }
     
     // Connect to Socket.io server
@@ -1639,6 +1654,11 @@ function initializeMultiplayer() {
     const multiplayerStrictnessSlider = document.getElementById('multiplayer-strictness-slider');
     if (multiplayerStrictnessSlider) {
         multiplayerStrictnessSlider.addEventListener('input', (e) => {
+            // Prevent strictness changes during active answering
+            if (state.multiplayer.buzzed) {
+                multiplayerStrictnessSlider.value = state.settings.strictness;
+                return;
+            }
             const value = parseInt(e.target.value);
             state.settings.strictness = value;
             const strictnessLabels = ['Lenient', 'Normal', 'Strict'];
@@ -1713,12 +1733,14 @@ function initializeMultiplayer() {
 
     state.multiplayer.socket.on('gameStarted', (data) => {
         console.log('Game started');
-        state.multiplayer.currentQuestion = 0;
+        state.multiplayer.currentQuestion = data.currentQuestion || 0;
         state.multiplayer.questions = data.questions;
         state.multiplayer.players = data.players;
         resetMultiplayerQuestionState();
         showScreen('multiplayer-game');
-        loadMultiplayerQuestion(data.questions);
+        if (state.multiplayer.currentQuestion < state.multiplayer.questions.length) {
+            loadMultiplayerQuestion(data.questions);
+        }
     });
 
     state.multiplayer.socket.on('playerBuzzed', (playerName) => {
