@@ -1012,13 +1012,15 @@ async function checkAnswer(userAnswer) {
     const cleanAnswer = stripHtmlTags(state.currentQuestion.answer);
     const strictnessMap = ['lenient', 'normal', 'strict'];
     const strictnessLevel = strictnessMap[state.settings.strictness || 1];
+    const normalizedGiven = strictnessLevel === 'lenient' ? userAnswer.toLowerCase() : userAnswer;
+    const normalizedAnswer = strictnessLevel === 'lenient' ? cleanAnswer.toLowerCase() : cleanAnswer;
     
     const response = await fetch(`${CONFIG.API_BASE}/check-answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            answerline: cleanAnswer,
-            givenAnswer: userAnswer,
+            answerline: normalizedAnswer,
+            givenAnswer: normalizedGiven,
             strictness: strictnessLevel
         })
     });
@@ -2353,9 +2355,9 @@ function displayLeaderboard(leaderboard) {
         let nameHtml = player.username;
         if (player.isVIP && player.nameColor) {
             const gradient = `linear-gradient(90deg, ${player.nameColor}, ${adjustColor(player.nameColor, -30)})`;
-            nameHtml = `<span style="background: ${gradient}; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 600; font-size: 1.1em;"><span style="font-size: 0.9em; text-shadow: 0 0 8px ${player.nameColor}; filter: drop-shadow(0 0 3px ${player.nameColor});">+</span> ${player.username}</span>`;
+            nameHtml = `<span style="background: ${gradient}; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 600; font-size: 1.1em;">${player.username}</span> <span style="color: ${player.nameColor}; font-weight: 700; font-size: 0.95em;">+</span>`;
         } else if (player.isVIP) {
-            nameHtml = `<span style="color: #fbbf24; font-weight: 600;">${player.username} <span style="font-size: 0.9em; text-shadow: 0 0 8px #fbbf24; filter: drop-shadow(0 0 3px #fbbf24);">+</span></span>`;
+            nameHtml = `<span style="color: #fbbf24; font-weight: 600;">${player.username} <span style="font-size: 0.95em;">+</span></span>`;
         }
         
         playerInfo.innerHTML = `
