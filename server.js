@@ -34,7 +34,38 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// VIP Code Validation Endpoint
+// Leaderboard storage
+const leaderboard = new Map(); // Map of username -> { pp20tuh, tossupsPlayed, isVIP, nameColor }
+
+app.post('/api/update-leaderboard', (req, res) => {
+    const { username, pp20tuh, tossupsPlayed, isVIP, nameColor } = req.body;
+    
+    if (!username || pp20tuh === undefined || tossupsPlayed === undefined) {
+        return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+    
+    // Only add to leaderboard if at least 1 tossup played
+    if (tossupsPlayed > 0) {
+        leaderboard.set(username, {
+            username,
+            pp20tuh,
+            tossupsPlayed,
+            isVIP: isVIP || false,
+            nameColor: nameColor || null
+        });
+    }
+    
+    return res.status(200).json({ success: true });
+});
+
+app.get('/api/leaderboard', (req, res) => {
+    const sorted = Array.from(leaderboard.values())
+        .sort((a, b) => b.pp20tuh - a.pp20tuh)
+        .slice(0, 50); // Top 50
+    
+    return res.status(200).json(sorted);
+});
+
 app.post('/api/validate-vip-code', (req, res) => {
     const { code, username } = req.body;
     

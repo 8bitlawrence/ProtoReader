@@ -16,6 +16,7 @@
             <a href="#" data-screen="home">Home</a>
             <a href="#" data-screen="database">Database</a>
             <a href="#" data-screen="statistics">Statistics</a>
+            <a href="#" data-screen="leaderboard">Leaderboard</a>
             <a href="#" data-screen="settings">Settings</a>
             <div id="profile-menu" style="display: none; position: relative;">
                 <button id="profile-btn" style="background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; color: var(--primary); font-weight: 500; padding: 0;">
@@ -323,6 +324,10 @@
                             <div class="stat-value" id="tossup-accuracy">0%</div>
                             <div class="stat-label">Accuracy</div>
                         </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="pp20tuh-display">0.0</div>
+                            <div class="stat-label">PP20TUH</div>
+                        </div>
                     </div>
                 </div>
                 <div class="stats-section">
@@ -344,6 +349,20 @@
                             <div class="stat-value" id="bonus-ppb-avg">0.0</div>
                             <div class="stat-label">Avg PPB</div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leaderboard Screen -->
+        <div id="leaderboard" class="screen">
+            <h2>Leaderboard - PP20TUH</h2>
+            <div class="setup-panel">
+                <div style="max-width: 800px; margin: 0 auto;">
+                    <div id="leaderboard-list" style="display: grid; gap: 0.75rem;"></div>
+                    <div style="text-align: center; color: var(--text-light); margin-top: 2rem; padding: 2rem; border-top: 1px solid var(--border);">
+                        <p>Leaderboard updates automatically when you finish tossup practice.</p>
+                        <p style="font-size: 0.9rem;">Only accounts with 1+ tossups played are shown.</p>
                     </div>
                 </div>
             </div>
@@ -410,6 +429,13 @@
                     <div class="slider-container">
                         <input type="range" id="font-size" min="12" max="24" value="16" step="1">
                         <span id="font-size-value">16px</span>
+                    </div>
+                </div>
+                <div id="vip-name-color-item" class="setting-item" style="display: none;">
+                    <label for="name-color-picker">VIP Name Color</label>
+                    <div style="display: flex; gap: 1rem; align-items: center;">
+                        <input type="color" id="name-color-picker" value="#fbbf24" style="width: 50px; height: 40px; border: 2px solid var(--border); border-radius: 6px; cursor: pointer;">
+                        <span id="color-preview" style="padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; background: linear-gradient(90deg, #fbbf24, #f59e0b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Preview</span>
                     </div>
                 </div>
                 <div class="setting-item">

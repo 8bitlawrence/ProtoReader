@@ -73,12 +73,14 @@ const state = {
         themeMode: 'light',
         glowEffect: 'none',
         strictness: 1,  // 0=lenient, 1=normal, 2=strict
-        fontSize: 16  // Font size in pixels
+        fontSize: 16,  // Font size in pixels
+        nameColor: '#fbbf24'  // VIP name color (default gold)
     },
     stats: {
         tossups: { correct: 0, incorrect: 0, played: 0, score: 0, powers: 0, normals: 0, negs: 0, dead: 0 },
         bonuses: { points: 0, partsCorrect: 0, partsPlayed: 0, played: 0 },
-        categories: {}
+        categories: {},
+        pp20tuh: 0  // Points per 20 tossups heard
     },
     multiplayer: {
         socket: null,
@@ -358,6 +360,12 @@ function initializeAccountSettings() {
     // Display current username
     currentUsername.value = state.auth.currentUser;
     
+    // Show/hide VIP name color option
+    const vipNameColorItem = document.getElementById('vip-name-color-item');
+    if (vipNameColorItem) {
+        vipNameColorItem.style.display = state.auth.isVIP ? 'block' : 'none';
+    }
+    
     // Display profile picture
     displayAccountProfilePicture();
     
@@ -568,6 +576,11 @@ function showScreen(screenName) {
     if (targetScreen) {
         targetScreen.classList.add('active');
         state.currentScreen = screenName;
+        
+        // Load leaderboard when visiting leaderboard screen
+        if (screenName === 'leaderboard') {
+            loadLeaderboard();
+        }
     } else {
         console.error(`Screen not found: ${screenName}`);
     }
@@ -1118,6 +1131,16 @@ function recordTossupResult(outcome) {
         state.stats.categories[category].incorrect++;
     }
     
+    // Calculate pp20tuh (points per 20 tossups heard)
+    if (state.stats.tossups.played > 0) {
+        state.stats.pp20tuh = (state.stats.tossups.score / state.stats.tossups.played * 20).toFixed(2);
+    }
+    
+    // Update leaderboard if logged in
+    if (state.auth.isLoggedIn) {
+        updateLeaderboard();
+    }
+    
     saveStatistics();
     updateGameStats();
 }
@@ -1427,6 +1450,19 @@ function initializeSettings() {
         saveSettings();
     });
     
+    // VIP Name Color Picker
+    const nameColorPicker = document.getElementById('name-color-picker');
+    if (nameColorPicker) {
+        nameColorPicker.addEventListener('change', (e) => {
+            if (!state.auth.isVIP) {
+                alert('This feature is available for ProtoReader+ members only!');
+                nameColorPicker.value = state.settings.nameColor;
+                return;
+            }
+            state.settings.nameColor = e.target.value;
+        });
+    }
+    
     document.getElementById('save-settings-btn').addEventListener('click', () => {
         saveSettings();
         showCustomAlert('Settings saved!');
@@ -1472,6 +1508,13 @@ function loadSettings() {
         if (fontSizeSlider && fontSizeValue) {
             fontSizeSlider.value = fontSize;
             fontSizeValue.textContent = `${fontSize}px`;
+        }
+        
+        // Load VIP name color
+        const nameColor = state.settings.nameColor || '#fbbf24';
+        const nameColorPicker = document.getElementById('name-color-picker');
+        if (nameColorPicker) {
+            nameColorPicker.value = nameColor;
         }
         
         // Load theme settings
@@ -1554,6 +1597,7 @@ function displayStatistics() {
         ? Math.round((state.stats.tossups.correct / state.stats.tossups.played) * 100)
         : 0;
     document.getElementById('tossup-accuracy').textContent = `${tossupAccuracy}%`;
+    document.getElementById('pp20tuh-display').textContent = state.stats.pp20tuh || '0.0';
     
     // Bonus stats
     document.getElementById('bonuses-played').textContent = state.stats.bonuses.played;
@@ -2179,4 +2223,101 @@ function updateMultiplayerScores(players) {
         scorePill.innerHTML = `${label} <span>${player.score}</span>`;
         scoresDiv.appendChild(scorePill);
     });
+}
+
+// ==================== Leaderboard ====================
+async function loadLeaderboard() {
+    try {
+        const response = await fetch('/api/leaderboard');
+        if (response.ok) {
+            const leaderboard = await response.json();
+            displayLeaderboard(leaderboard);
+        }
+    } catch (error) {
+        console.error('Error loading leaderboard:', error);
+    }
+}
+
+async function updateLeaderboard() {
+    if (!state.auth.isLoggedIn) return;
+    
+    try {
+        const response = await fetch('/api/update-leaderboard', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: state.auth.currentUser,
+                pp20tuh: parseFloat(state.stats.pp20tuh),
+                tossupsPlayed: state.stats.tossups.played,
+                isVIP: state.auth.isVIP,
+                nameColor: state.auth.isVIP ? state.settings.nameColor : null
+            })
+        });
+        
+        if (!response.ok) {
+            console.error('Failed to update leaderboard');
+        }
+    } catch (error) {
+        console.error('Error updating leaderboard:', error);
+    }
+}
+
+function displayLeaderboard(leaderboard) {
+    const leaderboardDiv = document.getElementById('leaderboard-list');
+    if (!leaderboardDiv) return;
+    
+    leaderboardDiv.innerHTML = '';
+    
+    leaderboard.forEach((player, index) => {
+        const playerEl = document.createElement('div');
+        playerEl.style.cssText = 'padding: 1rem; background: var(--bg-secondary); border-radius: 8px; display: flex; gap: 1rem; align-items: center; margin-bottom: 0.75rem; border: 1px solid var(--border-color);';
+        
+        // Rank with medal for top 3
+        const rankPill = document.createElement('div');
+        rankPill.style.cssText = 'min-width: 40px; text-align: center; font-weight: 700; font-size: 1.2rem;';
+        if (index === 0) rankPill.textContent = '🥇';
+        else if (index === 1) rankPill.textContent = '🥈';
+        else if (index === 2) rankPill.textContent = '🥉';
+        else rankPill.textContent = `#${index + 1}`;
+        
+        // Player info
+        const playerInfo = document.createElement('div');
+        playerInfo.style.cssText = 'flex: 1;';
+        
+        let nameHtml = player.username;
+        if (player.isVIP && player.nameColor) {
+            const gradient = `linear-gradient(90deg, ${player.nameColor}, ${adjustColor(player.nameColor, -30)})`;
+            nameHtml = `<span style="background: ${gradient}; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 600; font-size: 1.1em;"><span style="font-size: 0.9em; text-shadow: 0 0 8px ${player.nameColor}; filter: drop-shadow(0 0 3px ${player.nameColor});">+</span> ${player.username}</span>`;
+        } else if (player.isVIP) {
+            nameHtml = `<span style="color: #fbbf24; font-weight: 600;">${player.username} <span style="font-size: 0.9em; text-shadow: 0 0 8px #fbbf24; filter: drop-shadow(0 0 3px #fbbf24);">+</span></span>`;
+        }
+        
+        playerInfo.innerHTML = `
+            <div style="font-weight: 600; font-size: 1rem;">${nameHtml}</div>
+            <div style="font-size: 0.85rem; color: var(--text-light);">${player.tossupsPlayed} tossups played</div>
+        `;
+        
+        // PP20TUH
+        const pp20tuhPill = document.createElement('div');
+        pp20tuhPill.style.cssText = 'text-align: right; min-width: 80px;';
+        pp20tuhPill.innerHTML = `
+            <div style="font-weight: 700; font-size: 1.3rem; color: var(--primary);">${player.pp20tuh}</div>
+            <div style="font-size: 0.75rem; color: var(--text-light);">PP20TUH</div>
+        `;
+        
+        playerEl.appendChild(rankPill);
+        playerEl.appendChild(playerInfo);
+        playerEl.appendChild(pp20tuhPill);
+        leaderboardDiv.appendChild(playerEl);
+    });
+}
+
+// Helper function to adjust color brightness for gradient
+function adjustColor(color, percent) {
+    const num = parseInt(color.replace('#', ''), 16);
+    const amt = Math.round(2.55 * percent);
+    const R = Math.max(0, Math.min(255, (num >> 16) + amt));
+    const G = Math.max(0, Math.min(255, (num >> 8 & 0x00FF) + amt));
+    const B = Math.max(0, Math.min(255, (num & 0x0000FF) + amt));
+    return '#' + (0x1000000 + (R < 16 ? 0 : '') * R * 0x10000 + (G < 16 ? 0 : '') * G * 0x100 + (B < 16 ? 0 : '') * B).toString(16).slice(1);
 }
