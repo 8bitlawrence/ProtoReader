@@ -731,6 +731,28 @@ function stripHtmlTags(text) {
     return text.replace(/<[^>]*>/g, '');
 }
 
+function normalizeAnswerText(text) {
+    return text
+        .toLowerCase()
+        .replace(/[^a-z0-9\s'-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function getLastNameCandidate(answerline) {
+    if (!answerline) return '';
+    const base = answerline.split(/\(|\[|\bor\b|\baccept\b|\bprompt\b|\bdo not accept\b/i)[0];
+    const commaBase = base.split(',')[0];
+    const words = commaBase.trim().split(/\s+/).filter(Boolean);
+    if (words.length === 0) return '';
+    const suffixes = new Set(['jr', 'sr', 'ii', 'iii', 'iv', 'v']);
+    let last = words[words.length - 1];
+    if (suffixes.has(last.toLowerCase()) && words.length > 1) {
+        last = words[words.length - 2];
+    }
+    return last.replace(/[^a-z0-9'-]/gi, '');
+}
+
 function startTossupPractice() {
     state.questionIndex = 0;
     state.filters.yearStart = parseInt(document.getElementById('year-start').value) || 2010;
@@ -1012,15 +1034,26 @@ async function checkAnswer(userAnswer) {
     const cleanAnswer = stripHtmlTags(state.currentQuestion.answer);
     const strictnessMap = ['lenient', 'normal', 'strict'];
     const strictnessLevel = strictnessMap[state.settings.strictness || 1];
-    const normalizedGiven = strictnessLevel === 'lenient' ? userAnswer.toLowerCase() : userAnswer;
-    const normalizedAnswer = strictnessLevel === 'lenient' ? cleanAnswer.toLowerCase() : cleanAnswer;
+    const normalizedGiven = normalizeAnswerText(userAnswer);
+    const normalizedAnswer = normalizeAnswerText(cleanAnswer);
+
+    if (strictnessLevel === 'lenient') {
+        if (normalizedGiven && normalizedGiven === normalizedAnswer) {
+            return { directive: 'accept' };
+        }
+
+        const lastName = normalizeAnswerText(getLastNameCandidate(cleanAnswer));
+        if (lastName && normalizedGiven === lastName) {
+            return { directive: 'accept' };
+        }
+    }
     
     const response = await fetch(`${CONFIG.API_BASE}/check-answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            answerline: normalizedAnswer,
-            givenAnswer: normalizedGiven,
+            answerline: cleanAnswer,
+            givenAnswer: userAnswer,
             strictness: strictnessLevel
         })
     });
