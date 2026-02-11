@@ -265,6 +265,27 @@ function loadAuthState() {
     }
 }
 
+function getVipNameColor() {
+    return state.settings?.nameColor || '#fbbf24';
+}
+
+function buildVipNameHtml(username) {
+    const color = getVipNameColor();
+    const gradient = `linear-gradient(90deg, ${color}, ${adjustColor(color, -30)})`;
+    const plusIcon = `<span style="color: ${color}; margin-left: 0.25rem; font-weight: 700; font-size: 1.1em; text-shadow: 0 0 8px ${color}; filter: drop-shadow(0 0 3px ${color});">+</span>`;
+    return `<span style="background: ${gradient}; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 600;">${username}</span>${plusIcon}`;
+}
+
+function updateVipNamePreview(color) {
+    const preview = document.getElementById('color-preview');
+    if (!preview) return;
+    const gradient = `linear-gradient(90deg, ${color}, ${adjustColor(color, -30)})`;
+    preview.style.background = gradient;
+    preview.style.webkitBackgroundClip = 'text';
+    preview.style.webkitTextFillColor = 'transparent';
+    preview.style.backgroundClip = 'text';
+}
+
 function updateNavbar() {
     const loginLink = document.getElementById('login-link');
     const profileMenu = document.getElementById('profile-menu');
@@ -293,7 +314,7 @@ function updateNavbarForLoggedIn() {
         profileMenu.style.display = 'block';
         
         if (state.auth.isVIP) {
-            profileUsername.innerHTML = `${state.auth.currentUser} <span style="color: #fbbf24; margin-left: 0.25rem; font-weight: 700; font-size: 1.2em; text-shadow: 0 0 8px #fbbf24; filter: drop-shadow(0 0 3px #fbbf24);">+</span>`;
+            profileUsername.innerHTML = buildVipNameHtml(state.auth.currentUser);
         } else {
             profileUsername.textContent = state.auth.currentUser;
         }
@@ -736,6 +757,19 @@ async function loadNextTossup() {
     }
 }
 
+function skipCurrentTossup() {
+    if (!state.currentQuestion || state.answered) {
+        loadNextTossup();
+        return;
+    }
+
+    stopReading();
+    stopTimer();
+    stopBuzzWindow();
+    recordTossupResult('dead');
+    loadNextTossup();
+}
+
 async function fetchTossup() {
     const params = new URLSearchParams();
     params.append('number', '1');
@@ -1133,7 +1167,12 @@ function recordTossupResult(outcome) {
     
     // Calculate pp20tuh (points per 20 tossups heard)
     if (state.stats.tossups.played > 0) {
-        state.stats.pp20tuh = (state.stats.tossups.score / state.stats.tossups.played * 20).toFixed(2);
+        const powers = state.stats.tossups.powers;
+        const normals = state.stats.tossups.normals;
+        const negs = state.stats.tossups.negs;
+        const tuhs = state.stats.tossups.played;
+        const points = (powers * CONFIG.POWER_POINTS) + (normals * CONFIG.NORMAL_POINTS) + (negs * CONFIG.NEG_POINTS);
+        state.stats.pp20tuh = ((points / tuhs) * 20).toFixed(2);
     }
     
     // Update leaderboard if logged in
@@ -1460,11 +1499,19 @@ function initializeSettings() {
                 return;
             }
             state.settings.nameColor = e.target.value;
+            updateVipNamePreview(state.settings.nameColor);
+            if (state.auth.isLoggedIn) {
+                updateNavbar();
+            }
         });
     }
     
     document.getElementById('save-settings-btn').addEventListener('click', () => {
         saveSettings();
+        if (state.auth.isLoggedIn && state.auth.isVIP) {
+            updateNavbar();
+            updateLeaderboard();
+        }
         showCustomAlert('Settings saved!');
     });
 }
@@ -1516,6 +1563,7 @@ function loadSettings() {
         if (nameColorPicker) {
             nameColorPicker.value = nameColor;
         }
+        updateVipNamePreview(nameColor);
         
         // Load theme settings
         const themeMode = state.settings.themeMode || 'light';
@@ -1527,6 +1575,12 @@ function loadSettings() {
     // Always apply theme and font size (uses defaults if no saved settings)
     applyTheme();
     applyFontSize();
+
+    updateVipNamePreview(state.settings.nameColor || '#fbbf24');
+    const vipNameColorItem = document.getElementById('vip-name-color-item');
+    if (vipNameColorItem) {
+        vipNameColorItem.style.display = state.auth.isVIP ? 'block' : 'none';
+    }
 }
 
 function applyTheme() {
@@ -1688,7 +1742,7 @@ function initializeKeyboardControls() {
     
     // Control buttons
     document.getElementById('next-tossup-btn').addEventListener('click', loadNextTossup);
-    document.getElementById('skip-tossup-btn').addEventListener('click', loadNextTossup);
+    document.getElementById('skip-tossup-btn').addEventListener('click', skipCurrentTossup);
     document.getElementById('pause-tossup-btn').addEventListener('click', () => {
         if (state.readingInterval) {
             stopReading();
@@ -1749,7 +1803,11 @@ function initializeMultiplayer() {
 
     // Create room button
     document.getElementById('create-room-btn').addEventListener('click', () => {
-        state.multiplayer.socket.emit('createRoom', { playerName: state.multiplayer.playerName, isVIP: state.auth.isVIP });
+        state.multiplayer.socket.emit('createRoom', { 
+            playerName: state.multiplayer.playerName, 
+            isVIP: state.auth.isVIP,
+            nameColor: state.auth.isVIP ? state.settings.nameColor : null
+        });
     });
 
     // Refresh rooms button
@@ -1917,8 +1975,10 @@ function updatePlayersList(players) {
         
         // Check if player is VIP
         const isVIP = player.isVIP || false;
-        const nameStyle = isVIP ? 'background: linear-gradient(90deg, #fbbf24, #f59e0b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 600;' : '';
-        const plusIcon = isVIP ? ' <span style="color: #fbbf24; margin-left: 0.25rem; font-weight: 700; font-size: 1.1em; text-shadow: 0 0 8px #fbbf24; filter: drop-shadow(0 0 3px #fbbf24);">+</span>' : '';
+        const nameColor = player.nameColor || '#fbbf24';
+        const nameGradient = `linear-gradient(90deg, ${nameColor}, ${adjustColor(nameColor, -30)})`;
+        const nameStyle = isVIP ? `background: ${nameGradient}; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 600;` : '';
+        const plusIcon = isVIP ? ` <span style="color: ${nameColor}; margin-left: 0.25rem; font-weight: 700; font-size: 1.1em; text-shadow: 0 0 8px ${nameColor}; filter: drop-shadow(0 0 3px ${nameColor});">+</span>` : '';
         const hostBadge = player.isHost ? ' <strong style="color: var(--primary);">(Host)</strong>' : '';
         
         playerEl.innerHTML = `
@@ -1928,6 +1988,11 @@ function updatePlayersList(players) {
         list.appendChild(playerEl);
     });
 }
+        state.multiplayer.socket.emit('createRoom', { 
+            playerName: state.multiplayer.playerName, 
+            isVIP: state.auth.isVIP,
+            nameColor: state.auth.isVIP ? state.settings.nameColor : null
+        });
 
 function displayRoomsList(roomsList) {
     const roomsListDiv = document.getElementById('rooms-list');
@@ -1962,7 +2027,8 @@ function displayRoomsList(roomsList) {
             state.multiplayer.socket.emit('joinRoom', { 
                 roomCode: room.code,
                 playerName: state.multiplayer.playerName,
-                isVIP: state.auth.isVIP
+                isVIP: state.auth.isVIP,
+                nameColor: state.auth.isVIP ? state.settings.nameColor : null
             });
         };
         

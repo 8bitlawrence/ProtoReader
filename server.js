@@ -135,7 +135,8 @@ io.on('connection', (socket) => {
                 name: data.playerName,
                 score: 0,
                 isHost: true,
-                isVIP: data.isVIP || false
+                isVIP: data.isVIP || false,
+                nameColor: data.nameColor || null
             }],
             gameStarted: false,
             currentQuestion: 0,
@@ -183,7 +184,8 @@ io.on('connection', (socket) => {
             name: data.playerName,
             score: 0,
             isHost: false,
-            isVIP: data.isVIP || false
+            isVIP: data.isVIP || false,
+            nameColor: data.nameColor || null
         };
 
         room.players.push(player);
