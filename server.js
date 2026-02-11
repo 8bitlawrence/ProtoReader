@@ -68,6 +68,17 @@ io.on('connection', (socket) => {
             socket.emit('error', 'Room not found');
             return;
         }
+        
+        // Check if player is already in the room
+        const existingPlayer = room.players.find(p => p.id === socket.id);
+        if (existingPlayer) {
+            // Already in room, just send them the current state
+            socket.emit('roomJoined', {
+                roomCode: data.roomCode,
+                players: room.players
+            });
+            return;
+        }
 
         const player = {
             id: socket.id,
@@ -169,6 +180,9 @@ io.on('connection', (socket) => {
         if (room) {
             room.players = room.players.filter(p => p.id !== socket.id);
             socket.leave(data.roomCode);
+            
+            // Clear the socket's room code
+            delete socket.roomCode;
 
             if (room.players.length === 0) {
                 rooms.delete(data.roomCode);
@@ -181,6 +195,8 @@ io.on('connection', (socket) => {
                 }
                 io.to(data.roomCode).emit('updatePlayers', room.players);
             }
+            
+            console.log(`${socket.id} left room ${data.roomCode}`);
         }
     });
 

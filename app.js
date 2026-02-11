@@ -511,6 +511,33 @@ function resetToHome() {
     state.questionIndex = 0;
     state.buzzed = false;
     state.answered = false;
+    
+    // Reset multiplayer state
+    if (state.multiplayer.socket) {
+        state.multiplayer.roomCode = null;
+        state.multiplayer.playerName = null;
+        state.multiplayer.isHost = false;
+        state.multiplayer.players = [];
+        state.multiplayer.currentQuestion = 0;
+        state.multiplayer.questions = [];
+        state.multiplayer.currentQuestionData = null;
+        state.multiplayer.readingPosition = 0;
+        state.multiplayer.buzzed = false;
+        state.multiplayer.answered = false;
+        if (state.multiplayer.readingInterval) {
+            clearInterval(state.multiplayer.readingInterval);
+            state.multiplayer.readingInterval = null;
+        }
+        if (state.multiplayer.timerInterval) {
+            clearInterval(state.multiplayer.timerInterval);
+            state.multiplayer.timerInterval = null;
+        }
+        if (state.multiplayer.buzzWindowInterval) {
+            clearInterval(state.multiplayer.buzzWindowInterval);
+            state.multiplayer.buzzWindowInterval = null;
+        }
+    }
+    
     showScreen('home');
 }
 
@@ -1251,7 +1278,8 @@ function initializeSettings() {
         strictnessSlider.addEventListener('input', (e) => {
             const value = parseInt(e.target.value);
             state.settings.strictness = value;
-            document.getElementById('strictness-value').textContent = value;
+            const strictnessLabels = ['Lenient', 'Normal', 'Strict'];
+            document.getElementById('strictness-value').textContent = strictnessLabels[value];
         });
     }
     
@@ -1322,17 +1350,18 @@ function loadSettings() {
         
         // Load strictness
         const strictness = state.settings.strictness !== undefined ? state.settings.strictness : 1;
+        const strictnessLabels = ['Lenient', 'Normal', 'Strict'];
         const strictnessSlider = document.getElementById('strictness-slider');
         const strictnessValue = document.getElementById('strictness-value');
         if (strictnessSlider && strictnessValue) {
             strictnessSlider.value = strictness;
-            strictnessValue.textContent = strictness;
+            strictnessValue.textContent = strictnessLabels[strictness];
         }
         const multiplayerStrictnessSlider = document.getElementById('multiplayer-strictness-slider');
         const multiplayerStrictnessValue = document.getElementById('multiplayer-strictness-value');
         if (multiplayerStrictnessSlider && multiplayerStrictnessValue) {
             multiplayerStrictnessSlider.value = strictness;
-            multiplayerStrictnessValue.textContent = strictness;
+            multiplayerStrictnessValue.textContent = strictnessLabels[strictness];
         }
         
         document.getElementById('auto-reveal').checked = state.settings.autoReveal;
@@ -1592,7 +1621,10 @@ function initializeMultiplayer() {
         resetToHome();
     });
 
-    // Start game button (host only) - removed, game starts automatically
+    // Start game button (host only)
+    document.getElementById('start-multiplayer-btn').addEventListener('click', () => {
+        startMultiplayerGameAuto();
+    });
     
     // End game button
     document.getElementById('end-multiplayer-game-btn').addEventListener('click', () => {
@@ -1609,7 +1641,8 @@ function initializeMultiplayer() {
         multiplayerStrictnessSlider.addEventListener('input', (e) => {
             const value = parseInt(e.target.value);
             state.settings.strictness = value;
-            document.getElementById('multiplayer-strictness-value').textContent = value;
+            const strictnessLabels = ['Lenient', 'Normal', 'Strict'];
+            document.getElementById('multiplayer-strictness-value').textContent = strictnessLabels[value] || value;
         });
     }
 
@@ -1634,13 +1667,10 @@ function initializeMultiplayer() {
         state.multiplayer.roomCode = data.roomCode;
         state.multiplayer.isHost = true;
         document.getElementById('current-room-code').textContent = data.roomCode;
-        document.getElementById('start-multiplayer-btn').style.display = 'none';
-        document.getElementById('waiting-for-host').style.display = 'block';
-        document.getElementById('waiting-for-host').textContent = 'Game starting...';
+        document.getElementById('start-multiplayer-btn').style.display = 'block';
+        document.getElementById('waiting-for-host').style.display = 'none';
         showScreen('multiplayer-room');
-        
-        // Auto-start game immediately
-        startMultiplayerGameAuto();
+        console.log('Host can now click "Start Game" button to begin');
     });
 
     state.multiplayer.socket.on('roomJoined', (data) => {
@@ -1650,6 +1680,7 @@ function initializeMultiplayer() {
         document.getElementById('current-room-code').textContent = data.roomCode;
         document.getElementById('start-multiplayer-btn').style.display = 'none';
         document.getElementById('waiting-for-host').style.display = 'block';
+        document.getElementById('waiting-for-host').textContent = 'Waiting for host to start game...';
         showScreen('multiplayer-room');
         updatePlayersList(data.players);
     });
