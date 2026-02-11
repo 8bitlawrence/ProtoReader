@@ -8,6 +8,7 @@ const io = require('socket.io')(http, {
     }
 });
 const path = require('path');
+const fs = require('fs');
 
 // Middleware
 app.use(express.json());
@@ -34,8 +35,41 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Leaderboard storage
-const leaderboard = new Map(); // Map of username -> { pp20tuh, tossupsPlayed, isVIP, nameColor }
+// Leaderboard storage (persisted to disk)
+const leaderboard = new Map(); // Map of username -> { username, pp20tuh, tossupsPlayed, isVIP, nameColor }
+const LEADERBOARD_PATH = path.join(__dirname, 'leaderboard.json');
+
+function loadLeaderboardFromDisk() {
+    if (!fs.existsSync(LEADERBOARD_PATH)) {
+        return;
+    }
+
+    try {
+        const raw = fs.readFileSync(LEADERBOARD_PATH, 'utf8');
+        if (!raw) return;
+        const entries = JSON.parse(raw);
+        if (Array.isArray(entries)) {
+            entries.forEach((entry) => {
+                if (entry && entry.username) {
+                    leaderboard.set(entry.username, entry);
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Failed to load leaderboard from disk:', error);
+    }
+}
+
+function saveLeaderboardToDisk() {
+    try {
+        const entries = Array.from(leaderboard.values());
+        fs.writeFileSync(LEADERBOARD_PATH, JSON.stringify(entries, null, 2), 'utf8');
+    } catch (error) {
+        console.error('Failed to save leaderboard to disk:', error);
+    }
+}
+
+loadLeaderboardFromDisk();
 
 app.post('/api/update-leaderboard', (req, res) => {
     const { username, pp20tuh, tossupsPlayed, isVIP, nameColor } = req.body;
@@ -53,6 +87,7 @@ app.post('/api/update-leaderboard', (req, res) => {
             isVIP: isVIP || false,
             nameColor: nameColor || null
         });
+        saveLeaderboardToDisk();
     }
     
     return res.status(200).json({ success: true });
