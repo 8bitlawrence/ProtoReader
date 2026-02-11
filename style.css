@@ -124,6 +124,96 @@ body.glow-pulse-cyan-pink::before {
     }
 }
 
+body.glow-pulse-emerald-amber {
+    --glow-color: #10b981;
+    --glow-color-light: rgba(16, 185, 129, 0.3);
+    --glow-color-secondary: #f59e0b;
+    --glow-color-secondary-light: rgba(245, 158, 11, 0.3);
+}
+
+body.glow-pulse-emerald-amber::before {
+    background: 
+        radial-gradient(circle at 20% 30%, var(--glow-color-light) 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, var(--glow-color-secondary-light) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, var(--glow-color-light) 0%, transparent 50%);
+    animation: pulseEmeraldAmber 6s ease-in-out infinite;
+}
+
+@keyframes pulseEmeraldAmber {
+    0% {
+        opacity: 0.6;
+        filter: hue-rotate(0deg);
+    }
+    50% {
+        opacity: 1;
+        filter: hue-rotate(40deg);
+    }
+    100% {
+        opacity: 0.6;
+        filter: hue-rotate(0deg);
+    }
+}
+
+body.glow-pulse-sky-violet {
+    --glow-color: #0ea5e9;
+    --glow-color-light: rgba(14, 165, 233, 0.3);
+    --glow-color-secondary: #8b5cf6;
+    --glow-color-secondary-light: rgba(139, 92, 246, 0.3);
+}
+
+body.glow-pulse-sky-violet::before {
+    background: 
+        radial-gradient(circle at 20% 30%, var(--glow-color-light) 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, var(--glow-color-secondary-light) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, var(--glow-color-light) 0%, transparent 50%);
+    animation: pulseSkyViolet 6s ease-in-out infinite;
+}
+
+@keyframes pulseSkyViolet {
+    0% {
+        opacity: 0.6;
+        filter: hue-rotate(0deg);
+    }
+    50% {
+        opacity: 1;
+        filter: hue-rotate(80deg);
+    }
+    100% {
+        opacity: 0.6;
+        filter: hue-rotate(0deg);
+    }
+}
+
+body.glow-pulse-rose-teal {
+    --glow-color: #f43f5e;
+    --glow-color-light: rgba(244, 63, 94, 0.3);
+    --glow-color-secondary: #14b8a6;
+    --glow-color-secondary-light: rgba(20, 184, 166, 0.3);
+}
+
+body.glow-pulse-rose-teal::before {
+    background: 
+        radial-gradient(circle at 20% 30%, var(--glow-color-light) 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, var(--glow-color-secondary-light) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, var(--glow-color-light) 0%, transparent 50%);
+    animation: pulseRoseTeal 6s ease-in-out infinite;
+}
+
+@keyframes pulseRoseTeal {
+    0% {
+        opacity: 0.6;
+        filter: hue-rotate(0deg);
+    }
+    50% {
+        opacity: 1;
+        filter: hue-rotate(140deg);
+    }
+    100% {
+        opacity: 0.6;
+        filter: hue-rotate(0deg);
+    }
+}
+
 * {
     margin: 0;
     padding: 0;

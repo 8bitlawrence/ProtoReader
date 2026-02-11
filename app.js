@@ -1478,7 +1478,13 @@ function initializeSettings() {
     // Glow effect listener
     document.getElementById('glow-color').addEventListener('change', (e) => {
         const selectedTheme = e.target.value;
-        const vipThemes = ['pulse-gold-purple', 'pulse-cyan-pink'];
+        const vipThemes = [
+            'pulse-gold-purple',
+            'pulse-cyan-pink',
+            'pulse-emerald-amber',
+            'pulse-sky-violet',
+            'pulse-rose-teal'
+        ];
         
         if (vipThemes.includes(selectedTheme) && !state.auth.isVIP) {
             alert('This theme is available for ProtoReader+ members only. Claim your VIP code in Account Settings!');
@@ -1592,7 +1598,8 @@ function applyTheme() {
     // Remove all theme classes
     document.body.classList.remove('theme-light', 'theme-dark');
     document.body.classList.remove('glow-neon-pink', 'glow-cyan-dream', 'glow-purple-storm', 
-                                   'glow-sunset-fire', 'glow-ocean-wave', 'glow-aurora-lights');
+                                   'glow-sunset-fire', 'glow-ocean-wave', 'glow-aurora-lights',
+                                   'glow-pulse-emerald-amber', 'glow-pulse-sky-violet', 'glow-pulse-rose-teal');
     document.body.classList.remove('has-glow');
     
     // Apply theme mode
