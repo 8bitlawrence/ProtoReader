@@ -37,7 +37,19 @@ app.get('/', (req, res) => {
 
 // Leaderboard storage (persisted to disk)
 const leaderboard = new Map(); // Map of username -> { username, pp20tuh, tossupsPlayed, isVIP, nameColor }
-const LEADERBOARD_PATH = path.join(__dirname, 'leaderboard.json');
+const LEADERBOARD_PATH = process.env.LEADERBOARD_PATH || path.join(__dirname, 'leaderboard.json');
+
+function ensureLeaderboardFile() {
+    try {
+        const dir = path.dirname(LEADERBOARD_PATH);
+        fs.mkdirSync(dir, { recursive: true });
+        if (!fs.existsSync(LEADERBOARD_PATH)) {
+            fs.writeFileSync(LEADERBOARD_PATH, '[]', 'utf8');
+        }
+    } catch (error) {
+        console.error('Failed to initialize leaderboard file:', error);
+    }
+}
 
 function loadLeaderboardFromDisk() {
     if (!fs.existsSync(LEADERBOARD_PATH)) {
@@ -69,6 +81,7 @@ function saveLeaderboardToDisk() {
     }
 }
 
+ensureLeaderboardFile();
 loadLeaderboardFromDisk();
 
 app.post('/api/update-leaderboard', (req, res) => {

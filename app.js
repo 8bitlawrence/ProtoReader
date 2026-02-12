@@ -58,6 +58,8 @@ const state = {
     timeRemaining: CONFIG.TIMER_DURATION,
     buzzed: false,
     answered: false,
+    questionComplete: false,
+    buzzedAfterRead: false,
     filters: {
         categories: [],
         subcategories: [],
@@ -739,6 +741,45 @@ function normalizeAnswerText(text) {
         .trim();
 }
 
+function normalizeAnswerKey(text) {
+    return text.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function getAcceptedAliases(answerline) {
+    if (!answerline) return [];
+    const aliases = [];
+    const acceptRegex = /(?:^|[^a-z])(?:also\s+)?accept\s*:?\s*([^;\]\)]+)/gi;
+    let match;
+    while ((match = acceptRegex.exec(answerline)) !== null) {
+        const chunk = match[1];
+        chunk
+            .split(/,|\bor\b/gi)
+            .map((part) => part.trim())
+            .filter(Boolean)
+            .forEach((part) => aliases.push(part));
+    }
+
+    const expanded = [];
+    aliases.forEach((alias) => {
+        const cleaned = alias
+            .replace(/^[\s:;-]+/, '')
+            .replace(/^(the|a|an)\s+/i, '')
+            .replace(/\s*\(.*?\)\s*/g, ' ')
+            .trim();
+
+        if (cleaned) {
+            expanded.push(cleaned);
+        }
+
+        const shortForm = cleaned.split(/\bfor\b|\bas\b|\bin\b|\bof\b|\bto\b/i)[0]?.trim();
+        if (shortForm && shortForm !== cleaned) {
+            expanded.push(shortForm);
+        }
+    });
+
+    return Array.from(new Set(expanded));
+}
+
 function getLastNameCandidate(answerline) {
     if (!answerline) return '';
     const base = answerline.split(/\(|\[|\bor\b|\baccept\b|\bprompt\b|\bdo not accept\b/i)[0];
@@ -889,6 +930,7 @@ function stopReading() {
 }
 
 function startBuzzWindow() {
+    state.questionComplete = true;
     state.buzzWindowTime = 5;
     updateBuzzWindowDisplay();
     
@@ -927,6 +969,7 @@ function buzz() {
     if (state.buzzed || state.answered) return;
     
     state.buzzed = true;
+    state.buzzedAfterRead = state.questionComplete;
     state.buzzPosition = state.readingPosition;
     stopReading();
     stopBuzzWindow();
@@ -1036,6 +1079,15 @@ async function checkAnswer(userAnswer) {
     const strictnessLevel = strictnessMap[state.settings.strictness || 1];
     const normalizedGiven = normalizeAnswerText(userAnswer);
     const normalizedAnswer = normalizeAnswerText(cleanAnswer);
+    const keyGiven = normalizeAnswerKey(userAnswer);
+
+    const aliases = getAcceptedAliases(cleanAnswer);
+    if (aliases.length > 0) {
+        const aliasKeys = aliases.map((alias) => normalizeAnswerKey(alias));
+        if (keyGiven && aliasKeys.includes(keyGiven)) {
+            return { directive: 'accept' };
+        }
+    }
 
     if (strictnessLevel === 'lenient') {
         if (normalizedGiven && normalizedGiven === normalizedAnswer) {
@@ -1157,11 +1209,12 @@ function revealAnswer() {
 
 function getTossupOutcome(correct) {
     if (!state.buzzed) return 'dead';
-    if (!correct) return 'neg';
-    return isPowerBuzz() ? 'power' : 'normal';
+    if (!correct) return state.buzzedAfterRead ? 'dead' : 'neg';
+    return state.buzzedAfterRead ? 'normal' : (isPowerBuzz() ? 'power' : 'normal');
 }
 
 function isPowerBuzz() {
+    if (state.buzzedAfterRead) return false;
     const threshold = Math.max(1, Math.floor(state.currentQuestionWordCount * CONFIG.POWER_THRESHOLD));
     return state.buzzed && state.buzzPosition > 0 && state.buzzPosition <= threshold;
 }
@@ -1229,6 +1282,8 @@ function resetQuestionState() {
     state.currentQuestionWordCount = 0;
     state.buzzed = false;
     state.answered = false;
+    state.questionComplete = false;
+    state.buzzedAfterRead = false;
     state.buzzPosition = 0;
     state.timeRemaining = CONFIG.TIMER_DURATION;
     state.buzzWindowTime = 5;
