@@ -8,7 +8,7 @@ const io = require('socket.io')(http, {
     }
 });
 const path = require('path');
-const fs = require('fs');
+const mongoose = require('mongoose');
 
 // Middleware
 app.use(express.json());
@@ -35,54 +35,69 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Leaderboard storage (persisted to disk)
-const leaderboard = new Map(); // Map of username -> { username, pp20tuh, tossupsPlayed, isVIP, nameColor }
-const LEADERBOARD_PATH = process.env.LEADERBOARD_PATH || path.join(__dirname, 'leaderboard.json');
+// MongoDB Leaderboard Store
+const leaderboardSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
+    pp20tuh: { type: Number, required: true },
+    tossupsPlayed: { type: Number, required: true },
+    isVIP: { type: Boolean, default: false },
+    nameColor: String,
+    updatedAt: { type: Date, default: Date.now }
+});
 
-function ensureLeaderboardFile() {
-    try {
-        const dir = path.dirname(LEADERBOARD_PATH);
-        fs.mkdirSync(dir, { recursive: true });
-        if (!fs.existsSync(LEADERBOARD_PATH)) {
-            fs.writeFileSync(LEADERBOARD_PATH, '[]', 'utf8');
-        }
-    } catch (error) {
-        console.error('Failed to initialize leaderboard file:', error);
+class MongoLeaderboardStore {
+    constructor() {
+        this.LeaderboardEntry = mongoose.model('LeaderboardEntry', leaderboardSchema);
+    }
+
+    async init() {
+        // Mongoose handles table creation automatically
+        // Create index for sorting by pp20tuh
+        await this.LeaderboardEntry.collection.createIndex({ pp20tuh: -1 });
+    }
+
+    async upsert(entry) {
+        await this.LeaderboardEntry.updateOne(
+            { username: entry.username },
+            {
+                ...entry,
+                updatedAt: new Date()
+            },
+            { upsert: true }
+        );
+    }
+
+    async list(limit = 50) {
+        return await this.LeaderboardEntry
+            .find()
+            .sort({ pp20tuh: -1 })
+            .limit(limit)
+            .lean();
     }
 }
 
-function loadLeaderboardFromDisk() {
-    if (!fs.existsSync(LEADERBOARD_PATH)) {
-        return;
-    }
+let leaderboardStore;
+let leaderboardReady;
 
+async function initializeLeaderboardStore() {
     try {
-        const raw = fs.readFileSync(LEADERBOARD_PATH, 'utf8');
-        if (!raw) return;
-        const entries = JSON.parse(raw);
-        if (Array.isArray(entries)) {
-            entries.forEach((entry) => {
-                if (entry && entry.username) {
-                    leaderboard.set(entry.username, entry);
-                }
-            });
-        }
+        // Connect to MongoDB
+        const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/protoreader';
+        await mongoose.connect(mongoUri, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true
+        });
+        
+        leaderboardStore = new MongoLeaderboardStore();
+        await leaderboardStore.init();
+        console.log('Leaderboard storage: MongoDB');
     } catch (error) {
-        console.error('Failed to load leaderboard from disk:', error);
+        console.error('Failed to initialize MongoDB leaderboard:', error);
+        process.exit(1);
     }
 }
 
-function saveLeaderboardToDisk() {
-    try {
-        const entries = Array.from(leaderboard.values());
-        fs.writeFileSync(LEADERBOARD_PATH, JSON.stringify(entries, null, 2), 'utf8');
-    } catch (error) {
-        console.error('Failed to save leaderboard to disk:', error);
-    }
-}
-
-ensureLeaderboardFile();
-loadLeaderboardFromDisk();
+leaderboardReady = initializeLeaderboardStore();
 
 app.post('/api/update-leaderboard', (req, res) => {
     const { username, pp20tuh, tossupsPlayed, isVIP, nameColor } = req.body;
@@ -93,25 +108,33 @@ app.post('/api/update-leaderboard', (req, res) => {
     
     // Only add to leaderboard if at least 1 tossup played
     if (tossupsPlayed > 0) {
-        leaderboard.set(username, {
-            username,
-            pp20tuh,
-            tossupsPlayed,
-            isVIP: isVIP || false,
-            nameColor: nameColor || null
-        });
-        saveLeaderboardToDisk();
+        leaderboardReady
+            .then(() => leaderboardStore.upsert({
+                username,
+                pp20tuh,
+                tossupsPlayed,
+                isVIP: isVIP || false,
+                nameColor: nameColor || null
+            }))
+            .then(() => res.status(200).json({ success: true }))
+            .catch((error) => {
+                console.error('Failed to update leaderboard:', error);
+                res.status(500).json({ success: false, message: 'Failed to update leaderboard' });
+            });
+        return;
     }
-    
+
     return res.status(200).json({ success: true });
 });
 
 app.get('/api/leaderboard', (req, res) => {
-    const sorted = Array.from(leaderboard.values())
-        .sort((a, b) => b.pp20tuh - a.pp20tuh)
-        .slice(0, 50); // Top 50
-    
-    return res.status(200).json(sorted);
+    leaderboardReady
+        .then(() => leaderboardStore.list(50))
+        .then((entries) => res.status(200).json(entries))
+        .catch((error) => {
+            console.error('Failed to load leaderboard:', error);
+            res.status(500).json([]);
+        });
 });
 
 app.post('/api/validate-vip-code', (req, res) => {

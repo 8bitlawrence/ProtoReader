@@ -1109,6 +1109,24 @@ body.has-glow .stats-section {
     gap: 1rem;
 }
 
+.stats-actions {
+    margin-top: 1.25rem;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.clear-stats-btn {
+    background: var(--danger);
+    color: var(--white);
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+}
+
+.clear-stats-btn:hover {
+    background: #dc2626;
+}
+
 .stat-box {
     padding: 1rem;
     background: var(--bg-primary);

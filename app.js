@@ -127,6 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeMultiplayer();
     loadSettings();
     loadStatistics();
+    initializeStatsControls();
     initializeAuthPage();
     
     // Update navbar based on login status
@@ -184,6 +185,7 @@ function handleLogin() {
     initializeMultiplayer();
     loadSettings();
     loadStatistics();
+    initializeStatsControls();
     updateNavbar();
 }
 
@@ -238,6 +240,7 @@ function handleSignup() {
     initializeMultiplayer();
     loadSettings();
     loadStatistics();
+    initializeStatsControls();
     updateNavbar();
 }
 
@@ -1733,6 +1736,9 @@ function loadStatistics() {
         };
     }
     displayStatistics();
+    if (state.auth.isLoggedIn && state.stats.tossups.played > 0) {
+        updateLeaderboard();
+    }
 }
 
 function saveStatistics() {
@@ -1758,6 +1764,60 @@ function displayStatistics() {
         ? (state.stats.bonuses.points / state.stats.bonuses.played).toFixed(1)
         : '0.0';
     document.getElementById('bonus-ppb-avg').textContent = bonusPPB;
+}
+
+function initializeStatsControls() {
+    const clearTossupBtn = document.getElementById('clear-tossup-stats-btn');
+    if (clearTossupBtn) {
+        clearTossupBtn.addEventListener('click', () => {
+            const confirmed = confirm('Clear all tossup stats? This cannot be undone.');
+            if (!confirmed) return;
+            clearTossupStats();
+        });
+    }
+
+    const clearBonusBtn = document.getElementById('clear-bonus-stats-btn');
+    if (clearBonusBtn) {
+        clearBonusBtn.addEventListener('click', () => {
+            const confirmed = confirm('Clear all bonus stats? This cannot be undone.');
+            if (!confirmed) return;
+            clearBonusStats();
+        });
+    }
+}
+
+function clearTossupStats() {
+    state.stats.tossups = {
+        correct: 0,
+        incorrect: 0,
+        played: 0,
+        score: 0,
+        powers: 0,
+        normals: 0,
+        negs: 0,
+        dead: 0
+    };
+    state.stats.pp20tuh = 0;
+    state.stats.categories = {};
+
+    saveStatistics();
+    displayStatistics();
+    updateGameStats();
+    showCustomAlert('Tossup stats cleared');
+}
+
+function clearBonusStats() {
+    state.stats.bonuses = {
+        points: 0,
+        partsCorrect: 0,
+        partsPlayed: 0,
+        played: 0
+    };
+
+    saveStatistics();
+    displayStatistics();
+    updateBonusStats();
+    showCustomAlert('Bonus stats cleared');
 }
 
 // ==================== Sidebar Toggle ====================
