@@ -112,6 +112,17 @@ const state = {
     }
 };
 
+// ==================== Socket Helper ====================
+function safeEmit(eventName, data = {}) {
+    if (!state.multiplayer.socket || !state.multiplayer.socket.connected) {
+        console.error(`Cannot emit '${eventName}': socket not connected`);
+        alert('Not connected to server. Please refresh and try again.');
+        return false;
+    }
+    state.multiplayer.socket.emit(eventName, data);
+    return true;
+}
+
 // ==================== Initialization ====================
 document.addEventListener('DOMContentLoaded', () => {
     loadAuthState();
@@ -1928,6 +1939,7 @@ document.getElementById('search-btn')?.addEventListener('click', () => {
 function initializeMultiplayer() {
     // Only initialize Socket.io if it's available
     if (typeof io === 'undefined') {
+        console.error('Socket.IO library not loaded');
         return;
     }
     
@@ -1936,8 +1948,22 @@ function initializeMultiplayer() {
         state.multiplayer.socket.disconnect();
     }
     
-    // Connect to Socket.io server
+    // Connect to Socket.io server with error handling
     state.multiplayer.socket = io();
+
+    // Handle connection errors
+    state.multiplayer.socket.on('connect_error', (error) => {
+        console.error('Socket connection error:', error);
+        alert('Unable to connect to multiplayer server. Please check your connection and try again.');
+    });
+
+    state.multiplayer.socket.on('disconnect', (reason) => {
+        console.warn('Socket disconnected:', reason);
+        if (reason === 'io server disconnect') {
+            console.warn('Server disconnected the socket');
+            alert('Lost connection to server. Please refresh and try again.');
+        }
+    });
 
     // Handle player name entry
     document.getElementById('proceed-multiplayer-btn').addEventListener('click', () => {
@@ -1946,12 +1972,16 @@ function initializeMultiplayer() {
             alert('Please enter your name');
             return;
         }
+        if (!state.multiplayer.socket || !state.multiplayer.socket.connected) {
+            alert('Not connected to server. Please refresh and try again.');
+            return;
+        }
         state.multiplayer.playerName = playerName;
         document.getElementById('lobby-player-name').textContent = playerName;
         showScreen('multiplayer-lobby');
         
         // Request rooms list
-        state.multiplayer.socket.emit('getRooms');
+        safeEmit('getRooms');
     });
 
     // Back buttons
@@ -1960,6 +1990,10 @@ function initializeMultiplayer() {
 
     // Create room button
     document.getElementById('create-room-btn').addEventListener('click', () => {
+        if (!state.multiplayer.socket || !state.multiplayer.socket.connected) {
+            alert('Not connected to server. Please refresh and try again.');
+            return;
+        }
         state.multiplayer.socket.emit('createRoom', { 
             playerName: state.multiplayer.playerName, 
             isVIP: state.auth.isVIP,
@@ -1969,12 +2003,12 @@ function initializeMultiplayer() {
 
     // Refresh rooms button
     document.getElementById('refresh-rooms-btn').addEventListener('click', () => {
-        state.multiplayer.socket.emit('getRooms');
+        safeEmit('getRooms');
     });
 
     // Leave room button
     document.getElementById('leave-room-btn').addEventListener('click', () => {
-        state.multiplayer.socket.emit('leaveRoom', { roomCode: state.multiplayer.roomCode });
+        safeEmit('leaveRoom', { roomCode: state.multiplayer.roomCode });
         resetToHome();
     });
 
@@ -1985,7 +2019,7 @@ function initializeMultiplayer() {
     
     // End game button
     document.getElementById('end-multiplayer-game-btn').addEventListener('click', () => {
-        state.multiplayer.socket.emit('leaveRoom', { roomCode: state.multiplayer.roomCode });
+        safeEmit('leaveRoom', { roomCode: state.multiplayer.roomCode });
         resetToHome();
     });
 
@@ -2145,7 +2179,7 @@ function updatePlayersList(players) {
         list.appendChild(playerEl);
     });
 }
-        state.multiplayer.socket.emit('createRoom', { 
+        safeEmit('createRoom', { 
             playerName: state.multiplayer.playerName, 
             isVIP: state.auth.isVIP,
             nameColor: state.auth.isVIP ? state.settings.nameColor : null
@@ -2181,7 +2215,7 @@ function displayRoomsList(roomsList) {
         joinBtn.textContent = 'Join';
         joinBtn.style.cssText = 'padding: 0.5rem 1rem; font-size: 0.9rem;';
         joinBtn.onclick = () => {
-            state.multiplayer.socket.emit('joinRoom', { 
+            safeEmit('joinRoom', { 
                 roomCode: room.code,
                 playerName: state.multiplayer.playerName,
                 isVIP: state.auth.isVIP,
@@ -2324,7 +2358,7 @@ function buzzMultiplayer() {
     answerInput.focus();
     
     // Emit buzz to server
-    state.multiplayer.socket.emit('buzz', { 
+    safeEmit('buzz', { 
         roomCode: state.multiplayer.roomCode,
         playerName: state.multiplayer.playerName 
     });
@@ -2342,7 +2376,7 @@ async function startMultiplayerGameAuto() {
         const questions = await Promise.all(questionsPromises);
         state.multiplayer.questions = questions;
         
-        state.multiplayer.socket.emit('startGame', {
+        safeEmit('startGame', {
             roomCode: state.multiplayer.roomCode,
             questions: questions
         });
@@ -2379,7 +2413,7 @@ async function submitMultiplayerAnswer() {
     stopMultiplayerTimer();
     
     if (!userAnswer) {
-        state.multiplayer.socket.emit('submitAnswer', {
+        safeEmit('submitAnswer', {
             roomCode: state.multiplayer.roomCode,
             playerName: state.multiplayer.playerName,
             correct: false,
@@ -2392,7 +2426,7 @@ async function submitMultiplayerAnswer() {
         const result = await checkAnswer(userAnswer);
         const correct = result.directive?.toLowerCase() === 'accept';
         
-        state.multiplayer.socket.emit('submitAnswer', {
+        safeEmit('submitAnswer', {
             roomCode: state.multiplayer.roomCode,
             playerName: state.multiplayer.playerName,
             correct: correct,
@@ -2404,7 +2438,7 @@ async function submitMultiplayerAnswer() {
         const cleanAnswer = stripHtmlTags(state.multiplayer.currentQuestionData.answer).toLowerCase();
         const correct = userAnswer.toLowerCase().includes(cleanAnswer.slice(0, 5));
         
-        state.multiplayer.socket.emit('submitAnswer', {
+        safeEmit('submitAnswer', {
             roomCode: state.multiplayer.roomCode,
             playerName: state.multiplayer.playerName,
             correct: correct,

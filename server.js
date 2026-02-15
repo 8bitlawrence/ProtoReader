@@ -79,6 +79,30 @@ class MongoLeaderboardStore {
 let leaderboardStore;
 let leaderboardReady;
 
+// In-memory fallback leaderboard store
+class MemoryLeaderboardStore {
+    constructor() {
+        this.entries = [];
+    }
+
+    async init() {
+        console.log('Leaderboard storage: In-memory (fallback)');
+    }
+
+    async upsert(entry) {
+        const index = this.entries.findIndex(e => e.username === entry.username);
+        if (index >= 0) {
+            this.entries[index] = entry;
+        } else {
+            this.entries.push(entry);
+        }
+    }
+
+    async list(limit = 50) {
+        return this.entries.sort((a, b) => b.pp20tuh - a.pp20tuh).slice(0, limit);
+    }
+}
+
 async function initializeLeaderboardStore() {
     try {
         // Connect to MongoDB
@@ -92,8 +116,9 @@ async function initializeLeaderboardStore() {
         await leaderboardStore.init();
         console.log('Leaderboard storage: MongoDB');
     } catch (error) {
-        console.error('Failed to initialize MongoDB leaderboard:', error);
-        process.exit(1);
+        console.error('Failed to connect to MongoDB, using in-memory storage:', error.message);
+        leaderboardStore = new MemoryLeaderboardStore();
+        await leaderboardStore.init();
     }
 }
 
